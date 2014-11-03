@@ -1,5 +1,6 @@
 ## /Sum/:
 **Slippery Clip** is an optimized and portable clipboard management utility, mostly powered by minimalistic GUI with maximum keyboard support in mind. It provides easy-to-use storage mechanism for logging and processing any data sent to clipboard, complete with hotkey-based multipasting functionality.
+[b]Go get it @[/b] https://slipperyclip.codeplex.com/releases/view/132990
 
 ## /Featurae/:
 - _<u>*Overcoming innate limitations & enchancing general functionality of Windows' imbedded clipbuffer.*</u>_  
