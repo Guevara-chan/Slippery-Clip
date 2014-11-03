@@ -1,7 +1,7 @@
-Ever got concern that single datachunk capacity of clipboard is anything but enough ?
-Mused about trackable list of Ctrl+C'ed fragments with ability to review any ?
-Resorted to using Notepad and Paint as intermediate storages ?
-...Let us cling together:
+_Ever got concern that single datachunk capacity of clipboard is anything but enough ?_  
+_Mused about trackable list of Ctrl+C'ed fragments with ability to review any ?_  
+_Resorted to using Notepad and Paint as intermediate storages ?_  
+_...Let us cling together:_
  
 #### ; &lt;Sum&gt;:
 
