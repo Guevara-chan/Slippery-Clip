@@ -2,7 +2,6 @@
 
 ```sh
 $ npm install --global pageres
-```
 
 ## ; &lt;Sum&gt;:
 ```
