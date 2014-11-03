@@ -1,7 +1,7 @@
-::
+:![SC.Logo](https://slipperyclip.codeplex.com/):
 
 ## /Sum/:
-**Slippery Clip** is an optimized and portable clipboard management utility, mostly powered by minimalistic GUI with m'ax'imum keyboard support in mind. It provides easy-to-use storage mechanism for logging and processing any data sent to clipboard, complete with hotkey-based multipasting functionality.  
+**Slippery Clip** is an optimized and portable clipboard management utility, mostly powered by minimalistic GUI with maximum keyboard support in mind. It provides easy-to-use storage mechanism for logging and processing any data sent to clipboard, complete with hotkey-based multipasting functionality.  
 **Go get it @** https://slipperyclip.codeplex.com/downloads/get/909020
 
 ## /Featurae/:
