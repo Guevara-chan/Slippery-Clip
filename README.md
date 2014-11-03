@@ -10,9 +10,9 @@
 - Raw text, HTML, bitmap, RTF, metaimage and path listings support.
 - Up to ten hotslots for rapid multipasting emulation (Ctrl+[0-9]).
 - Plain .INI-based settings storage with no access to registry ever.
-- Asynchronous search engine with regexp and reparsing support.  
-- Intercessional data preservation within single dedicated file.  
-- Consistent runtime autocompression for all absorbed data.  
-- Basic Drag/Drop support for outside communications.  
-- RUS<->ENG rapid xlat conversion (hotkey available).  
-- Complete Unicode-compilancy.  
+- Asynchronous search engine with regexp and reparsing support.
+- Intercessional data preservation within single dedicated file.
+- Consistent runtime autocompression for all absorbed data.
+- Basic Drag/Drop support for outside communications.
+- RUS<->ENG rapid xlat conversion (hotkey available).
+- Complete Unicode-compilancy.
