@@ -2,8 +2,8 @@
 **Slippery Clip** is an optimized and portable clipboard management utility, mostly powered by minimalistic GUI with maximum keyboard support in mind. It provides easy-to-use storage mechanism for logging and processing any data sent to clipboard, complete with hotkey-based multipasting functionality.
 
 ## /Featurae/:
-**-->** Overcoming innate limitations & enchancing general functionality of Windows' imbedded clipbuffer.  
-**=>** Rather vast array of hotkeys, rendering ~80% of functionally to be accessible from keyboard.  
+**** Overcoming innate limitations & enchancing general functionality of Windows' imbedded clipbuffer.  
+**** Rather vast array of hotkeys, rendering ~80% of functionally to be accessible from keyboard.  
 **=>** XCopy-based installation process. Single ‘SlipperyClip.exe’ is enough for functioning.  
 **=>** Multitask data viewing system with no limits about simultaneous window opening.  
 **->** Unobtrusive PreXP-stylish design with optional opacity and border snapping.  
