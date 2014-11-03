@@ -17,7 +17,7 @@
 - RUS<->ENG rapid xlat conversion (hotkey available).
 - Complete Unicode-compilancy.
 
-## /Brief samples of interfacing/
+## /Brief samples of interfacing/:
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=slipperyclip&DownloadId=908977)
 
 ![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=slipperyclip&DownloadId=909008)
