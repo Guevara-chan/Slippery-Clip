@@ -3,7 +3,7 @@
 **Go get it @** https://slipperyclip.codeplex.com/downloads/get/909020
 
 ## /Featurae/:
-- `_*Overcoming innate limitations & enchancing general functionality of Windows' imbedded clipbuffer.*_`  
+- <b>*Overcoming innate limitations & enchancing general functionality of Windows' imbedded clipbuffer.*</b>  
 - Rather vast array of hotkeys, rendering ~80% of functionally to be accessible from keyboard.
 - XCopy-based installation process. Single ‘SlipperyClip.exe’ is enough for functioning.
 - Multitask data viewing system with no limits about simultaneous window opening.
