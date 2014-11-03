@@ -3,13 +3,13 @@
 
 ## /Featurae/:
 - <u>*Overcoming innate limitations & enchancing general functionality of Windows' imbedded clipbuffer.*</u>  
-- Rather vast array of hotkeys, rendering ~80% of functionally to be accessible from keyboard.  
-- XCopy-based installation process. Single ‘SlipperyClip.exe’ is enough for functioning.  
-- Multitask data viewing system with no limits about simultaneous window opening.  
-- Unobtrusive PreXP-stylish design with optional opacity and border snapping.  
-- Raw text, HTML, bitmap, RTF, metaimage and path listings support.  
-- Up to ten hotslots for rapid multipasting emulation (Ctrl+[0-9]).  
-- Plain .INI-based settings storage with no access to registry ever.  
+- Rather vast array of hotkeys, rendering ~80% of functionally to be accessible from keyboard.
+- XCopy-based installation process. Single ‘SlipperyClip.exe’ is enough for functioning.
+- Multitask data viewing system with no limits about simultaneous window opening.
+- Unobtrusive PreXP-stylish design with optional opacity and border snapping.
+- Raw text, HTML, bitmap, RTF, metaimage and path listings support.
+- Up to ten hotslots for rapid multipasting emulation (Ctrl+[0-9]).
+- Plain .INI-based settings storage with no access to registry ever.
 - Asynchronous search engine with regexp and reparsing support.  
 - Intercessional data preservation within single dedicated file.  
 - Consistent runtime autocompression for all absorbed data.  
