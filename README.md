@@ -18,7 +18,7 @@
 - RUS<->ENG rapid xlat conversion (hotkey available).
 - Complete Unicode-compilancy.
 
-##; <Reassembling>:
+##; /Reassembling/:
 SlipperyClip is written completely in PureBasic v5.30 with few fixes for v5.24 compatibility.  
 It relies on single dependency: COMate+ by nxSoftWare.  
 To compile project use 'Main.pb' as root sourcefile.  
