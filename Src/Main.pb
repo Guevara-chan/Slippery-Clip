@@ -1,9 +1,12 @@
-﻿; -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+﻿; *-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-*
 ; Slippery Clip|board manager v1.2
 ; Developed in 2010 by Guevara-chan.
-; -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+; *-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-*
 
-;{ TO.DO[
+;{ =[TO.DO]=
+; TO.DO Добавить всплывающее меню для вставки.
+; TO.DO Перенести больше функций на обработку с клавиатуры.
+; -----------------------------------------------------------------------------
 ; TO.DO Вернуть подсветку найденного HTML (некорректно считается смещение).
 ; TO.DO Исправить неполадки с автопролистыванием неполностью отображенного нода.
 ; TO.DO Оптимизировать заполнение окна предпросмотра.
@@ -27,8 +30,9 @@
 ; TO.DO GUI: Поправить потерю крусора при нагрузке.
 ; TO.DO GUI: Разобраться со средней кнопкой мыши в главном окне.
 ; TO.DO GUI: Разобраться с мерцанием окон просмотра на +/-.
-;} ]TO.DO
+;} {End/TO.DO}
 
+; --Preparations--
 CompilerIf #PB_Compiler_Unicode
 IncludeFile "OLEdit.pbi"
 IncludeFile "COMate\COMatePLUS.pbi"
@@ -41,7 +45,7 @@ UseBriefLZPacker()        ; For data saving.
 CompilerElse : CompilerError "No. Just no. Try it Unicode next time"
 CompilerEndIf ; ^To notify that you done things tremendously wrong^
 
-;{ Definitions
+;{ [Definitions]
 ;{ --Constants--
 #Kb            = 1024
 #UsedNode      = "->"
@@ -49,6 +53,7 @@ CompilerEndIf ; ^To notify that you done things tremendously wrong^
 #BringKey      = 'T'
 #SwapKey       = 'Q'
 #SaveKey       = 'S'
+#Deployment    = 'X'
 #Unlimited     = '0'
 #HotKeys       = 9
 #IniFile       = "Settings.ini"
@@ -86,7 +91,7 @@ CompilerEndIf ; ^To notify that you done things tremendously wrong^
 #DumpSig   = 1564693339 ; '[SC]'
 #ReconMsg  = #CR$ + "Procedure aborted. Reconsider list limitations."
 #WinFlags  = #PB_Window_SystemMenu|#PB_Window_Tool|#PB_Window_SizeGadget|#PB_Window_Invisible
-#VPFlags   = #WinFlags | #PB_Window_WindowCentered
+#VPFlags   = #WinFlags
 #DefFlags  = #PB_Font_Bold|#PB_Font_Italic|#PB_Font_HighQuality
 #DragOff   = #PB_Drag_Copy|#PB_Drag_Link|#PB_Drag_Move
 #CtrlShift = #MOD_CONTROL | #MOD_SHIFT
@@ -207,18 +212,20 @@ Enumeration #PB_Compiler_EnumerationValue + #HotKeys ; Menu items.
 #cReturn   ; Shared virtual item.
 #cCtrlA    ; Shared virtual item.
 #cCtrlV    ; Shared virtual item.
+#cBindData ; Anchor.
 EndEnumeration
 
-Enumeration #PB_Compiler_EnumerationValue ; More menu items.
-#vMaximize
-#vStoreSize
+Enumeration #PB_Compiler_EnumerationValue + #HotKeys ; More menu items.
 #vCenterWin
+#vMaximize
 #vReturnSize
+#vSwitchSize
 #vSizeUp
 #vSizeDown
 #vSaveAs
 #vSaveSnap
 #vCopy
+#vCopyMD
 #vCopyRaw
 #vSelectAll
 #vHighlight
@@ -297,6 +304,7 @@ Enumeration ; Menus
 #mVPMenu
 #mSearchMenu
 #mTrayMenu
+#mDeployment
 EndEnumeration
 ;}
 ;{ --Structures--
@@ -351,11 +359,16 @@ TextData.s   ; Associated text (if any).
 Sizing.Point ; To clip metafile sizing.
 *ViewPort.ViewPort   ; Associated viewport.
 *CacheData.CacheData ; Associated cache entry.
+VPSizing.Rect        ; Size params for associated viewport.
+StructureUnion       ; ===>Special flags goes here:
+RandFlag.i   ; Abstract interface for flag access.
+WrapFlag.i   ; Flag for view area being wrapped.
+EndStructureUnion
 EndStructure
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Structure CacheData
-TextData.s  ; Cache text.
-DataSize.i  ; Size of cached data (in bytes).
+TextData.s   ; Cache text.
+DataSize.i   ; Size of cached data (in bytes).
 Expiration.i ; Time to uncache stored data.
 *ClipData.ClipData ; Associated clip entry.
 EndStructure
@@ -400,7 +413,6 @@ MimicList.i ; Shows if viewport should mimic data list.
 PrevIndex.s ; String representation of former VP' index.
 *Frame      ; Artifical frame around view area.
 *Img        ; Pointer to associated image, if applicable.
-WrapFlag.i  ; Flag for view area being wrapped.
 WasVisible.i; Flag for viewport being visible before hiding self.
 *WebObject.COMateObject ; For complex browser controlling.
 *WinCom.COMateObject    ; For complex browser controlling.
@@ -479,8 +491,6 @@ PostFlag.i    ; New data was posted to clip (flag).
 ListToolTip.s ; Current tooltip, dispalyed by data list.
 *ListID       ; System pointer to ClipList gadget.
 *VoidGadget   ; System pointer to 'void' gadget.
-VPWidth.i     ; Init width of viewports.
-VPHeight.i    ; Init height of viewports.
 RenderBack.l  ; Background color for rendering metafiles.
 Delita.i      ; Factor for wiped out data.
 DelState.i    ; Accumulator for deletion position.
@@ -512,6 +522,7 @@ GUIEvent.EventData             ; Common event accumulator.
 Lurker.SearchEngine            ; Data for performing search.
 FlickBuf.UnFlicker             ; Accumulator for anti-flicking measures.
 Informator.InfoBlock           ; Information summarizing system.
+VoidBorders.Rect               ; Null proxy rectangle for initializng new VPorts.
 *ViewPort.ViewPort             ; Pointer to current viewport in use.
 *WebObject.IWebBrowser2        ; HTML parser interface.
 *ComBrowser.COMateObject       ; COM parser auxilary object.
@@ -532,9 +543,9 @@ EndStructure
 ;{ --Variables--
 Global I, System.SystemData
 ;}
-;} EndDefinitions
+;} {End/Definitions}
 
-;{ Procedures
+;{ [Procedures]
 ;{ @WayMarks@
 ; Panopticum - окно предпросмотра. Ищется по #cPanopticum
 ; Обработчики пунктов можно найти по отметке !MenuHandler
@@ -615,6 +626,14 @@ EndProcedure
 Procedure Min(A, B)
 If A < B : ProcedureReturn A : Else : ProcedureReturn B : EndIf
 EndProcedure
+
+Macro DelayReturn() ; Partializer.
+Define __ReturnFlag = #True
+EndMacro
+
+Macro ReviseReturn(RetVal =) ; Partializer.
+If __ReturnFlag : ProcedureReturn RetVal : EndIf
+EndMacro
 
 Procedure EncodeData(*Ptr, Size)
 If Size < 20 : ProcedureReturn #False : EndIf ; А вот дабы было не повадно.
@@ -868,6 +887,16 @@ EndMacro
 Macro DefBarButton(IDx, Text, Font = #fButtonFont, SpecialFlags = #Null) ; Partializer
 ButtonGadget(IDx, 0, 0, 0, #ButtonHeight, Text, #BS_FLAT | SpecialFlags) : SetGadgetFont(IDX, FontID(Font))
 EndMacro
+
+Procedure BoundCoord(Val, Edge, Shift)
+If Val < 0 : Val = 0 : ElseIf Val + Shift > Edge : Val = Edge - Shift : EndIf : ProcedureReturn Val
+EndProcedure
+
+Procedure PlaceWindowStrict(*WindowID, X, Y)
+ExamineDesktops()
+ResizeWindow(*WindowID, BoundCoord(X, DesktopWidth(0), WindowWidth(*WindowID, #PB_Window_FrameCoordinate)), 
+                        BoundCoord(Y, DesktopHeight(0), WindowHeight(*WindowID, #PB_Window_FrameCoordinate)), #PB_Ignore, #PB_Ignore)
+EndProcedure
 ;}
 ;{ --Cache management-
 Procedure UncacheNode(*DataNode.ClipData)
@@ -1152,6 +1181,10 @@ EndMacro
 
 Procedure CloseViewPort(*VPort.ViewPort) ; Does not belong here, but...
 HideWindow(*VPort\WindowID, #True) : DisposeVPData(*VPort) : WebDisposal() ; Скрываем и удаляем данные.
+With *VPort\DataNode\VPSizing         ; Сжохраняем данные местоположения, просто на всякий случай.
+\Left  = WindowX(*VPort\WindowID)     : \Top    = WindowY(*VPort\WindowID)
+\Right = WindowWidth(*VPort\WindowID) : \Bottom = WindowHeight(*VPort\WindowID)
+EndWith ; Теперь все закрываем и все уничтожаем из GUI:
 CloseWindow(*VPort\WindowID) : *VPort\DataNode\ViewPort = #Null : *VPort\WindowID = #Null 
 ChangeCurrentElement(System\ViewPorts(), *Vport) : DeleteElement(System\ViewPorts())
 SetForegroundWindow_(System\MainWindow) : SAG()
@@ -1181,13 +1214,15 @@ ProcedureReturn *VP\WebObject\GetStringProperty("Document\Body\innerText")
 Default : ProcedureReturn GetGadgetText(*VP\ViewArea) ; Стандартное извлечение.
 EndSelect
 EndProcedure
-
-Macro Textuality() ; Partializer.
-#CF_TEXT, #CF_RichText, #CF_HTML, #CF_HDROP
-EndMacro
-
+; ------------------------
+Procedure IsTextNode(*DN.ClipData, CheckHTML = #False)
+Select *DN\DataType : Case #CF_TEXT, #CF_RichText, #CF_HDROP : ProcedureReturn #True 
+											Case #CF_HTML : ProcedureReturn CheckHTML
+EndSelect
+EndProcedure
+; ------------------------
 Procedure.s ExtractText(*DN.ClipData, *GRsr = #Null)
-Select *DN\DataType : Case Textuality() : Default : ProcedureReturn "" : EndSelect ; Заглушка.
+If IsTextNode(*DN, #True) = #False : ProcedureReturn "" : EndIf ; Заглушка.
 Define Plain.s = RequestCachedText(*DN)
 If Plain = "" ; Если в кеше ничего нет, либо там пустая строка...
 If *DN\ViewPort : Plain = ExtractVPText(*DN\ViewPort) ; Извлекаем из области просмотра.
@@ -1762,9 +1797,13 @@ Procedure WriteHEaderField(*Base, *Offset, *Val)
 Define Value.s = Zerorial(Str(*Val)) : CopyMemory(@Value, *Base + *Offset, StringByteLength(Value))
 EndProcedure
 
+Macro SpanHTML(HTML) ; Pseudo-procedure.
+"<SPAN>" + HTML + "</SPAN>"
+EndMacro
+
 Procedure FormatHTML(HTML.S)
 If HTML ; Если есть, о чем говорить...
-HTML = #PreHTML + "<SPAN>" + HTML + "</SPAN>" + #PostHTML              ; Обрамляем тегами, вот да.
+HTML = #PreHTML + SpanHTML(HTML) + #PostHTML                                        ; Обрамляем тегами, вот да.
 Define Header.s = "Version:0.9" + #LF$ + "StartHTML:", *HTMLStart = CurrentHdrPos() ; Начало HTML.
 Define Header.s = EndHdrField() + "EndHTML:"         , *HTMLEnd   = CurrentHdrPos() ; Конец HTML.
 Define Header.s = EndHdrField() + "StartFragment:"   , *FragStart = CurrentHdrPos() ; Начало фрагмента.
@@ -1863,14 +1902,30 @@ Macro InvalidateGroup(GName) ; Pseudo-procedure.
 RemovePreferenceGroup(GName) : PreferenceGroup(GName)
 EndMacro
 
+Macro WritePrefixedInteger(Key, Value, Pref = ".") ; Pseudo-procedure.
+CompilerIf Pref <> "." : Define Prefix.s = Pref
+CompilerEndIf          : WritePreferenceInteger(Prefix + "." + Key, Value)
+EndMacro
+
+Macro WriteWindowPos(WinID, Pref = ".") ; Pseudo-procedure.
+WritePrefixedInteger("X", WindowX(WinID), Pref)
+WritePrefixedInteger("Y", WindowY(WinID))
+EndMacro
+
+Macro WriteWindowRect(WinID, Pref = ".") ; Pseudo-procedure.
+WriteWindowPos(WinID, Pref) 
+WritePrefixedInteger("Width", WindowWidth(WinID))
+WritePrefixedInteger("Height", WindowHeight(WinID))
+EndMacro
+
 Procedure WriteAllPrefs()
 CloseFile(CreateFile(#PB_Any, #IniFile)) : OpenIniFile() 
 InvalidateGroup("GUI.List") ; Открываем -> cоздаем группу.
-WritePreferenceInteger("List.BackColor"   , GetGadgetColor(#ClipList, #PB_Gadget_BackColor))
-WritePreferenceInteger("List.FrontColor"  , GetGadgetColor(#ClipList, #PB_Gadget_FrontColor))
-WritePreferenceString("List.FontName"     , GetFontName(System\ListFont))
-WritePreferenceFloat("List.FontSize"      , GetFontHeight(System\ListFont))
-WritePreferenceInteger("List.FontFlags"   , GetFontStyle(System\ListFont))
+WritePreferenceInteger("List.BackColor" , GetGadgetColor(#ClipList, #PB_Gadget_BackColor))
+WritePreferenceInteger("List.FrontColor", GetGadgetColor(#ClipList, #PB_Gadget_FrontColor))
+WritePreferenceString ("List.FontName"  , GetFontName(System\ListFont))
+WritePreferenceFloat  ("List.FontSize"  , GetFontHeight(System\ListFont))
+WritePreferenceInteger("List.FontFlags" , GetFontStyle(System\ListFont))
 With System\Options
 InvalidateGroup("Misc") ; Создаем.
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -1881,14 +1936,9 @@ WritePreferenceInteger("MaxEntries"  , \ListMax)
 WritePreferenceInteger("SizeLimit"   , \SizeLimit)
 WritePreferenceInteger("PreserveHotkeys", \HPreserve)
 EndWith : InvalidateGroup("Volatile") ; Открываем->cоздаем.
-WritePreferenceInteger("Window.X", WindowX(#MainWindow))
-WritePreferenceInteger("Window.Y", WindowY(#MainWindow))
-WritePreferenceInteger("Window.Width", WindowWidth(#MainWindow))
-WritePreferenceInteger("Window.Height", WindowHeight(#MainWindow))
-WritePreferenceInteger("OptWin.X", WindowX(#SettingsWindow))
-WritePreferenceInteger("OptWin.Y", WindowY(#SettingsWindow))
-WritePreferenceInteger("VP.InitWidth", System\VPWidth)
-WritePreferenceInteger("VP.InitHeight", System\VPHeight)
+WriteWindowRect(#MainWindow, "Window")
+WriteWindowPos(#SettingsWindow, "OptWin")
+WriteWindowRect(System\Panopticum\WindowID, "PanWin")
 WritePreferenceInteger("Raster.DefType", System\RasterType)
 WritePreferenceInteger("Data.AcceptNew", System\AcceptNew)
 WritePreferenceInteger("Render.BackColor", System\RenderBack)
@@ -1904,26 +1954,26 @@ Macro ReadPreferenceFloatEX(Value, Key, InitValue) ; Pseudo-procedure.
 Value = ReadPreferenceFloat(Key, InitValue) ; Считываем.
 If Value < 0 : RemovePreferenceKey(Key) : Value = InitValue : EndIf
 EndMacro
+; --------------------------
+Macro ReadWindowPosition(WindowID, Prefix) ; Pseudo-procedure.
+PlaceWindowStrict(WindowID, ReadPreferenceInteger(Prefix + ".X", WindowX(WindowID)),
+                            ReadPreferenceInteger(Prefix + ".Y", WindowY(WindowID)))
+EndMacro
 
+Macro ReadWindowRect(Window, Prefix)
+Define Width  : ReadPreferenceIntegerEX(Width , Prefix + ".Width" , #MinWidth)
+Define Height : ReadPreferenceIntegerEX(Height, Prefix + ".Height", #MinHeight)
+ResizeWindow(Window, #PB_Ignore, #PB_Ignore, Width, Height)
+ReadWindowPosition(Window, Prefix)
+EndMacro
+; --------------------------
 Macro RestoreVolatile() ; Partializer.
 PreferenceGroup("Volatile") ; Загружаем.
 ReadPreferenceIntegerEX(System\RasterType, "Raster.DefType", 0, 3) ; Формат растра.
 If ReadPreferenceInteger("Data.AcceptNew", #True) : System\AcceptNew = #True : EndIf
-Define Width : ReadPreferenceIntegerEX(Width, "Window.Width", #MinWidth)
-Define Height : ReadPreferenceIntegerEX(Height,"Window.Height", #MinHeight)
-ExamineDesktops() ; Замеряем текущее разрешение экрана для полноты картины.
-Define X : ReadPreferenceIntegerEX(X, "Window.X", WindowX(#MainWindow), DesktopWidth(0)  - Width  / 4)
-Define Y : ReadPreferenceIntegerEX(Y, "Window.Y", WindowY(#MainWindow), DesktopHeight(0) - Height / 4)
-ResizeWindow(#MainWindow, X, Y, Width, Height) ; Применение значений.
-ReadPreferenceIntegerEX(System\VPWidth, "VP.InitWidth", #VPortMinWidth)
-ReadPreferenceIntegerEX(System\VPHeight, "VP.InitHeight", #VPortMinHeight)
+ReadWindowRect(#MainWindow, "Window") : ReadWindowRect(System\Panopticum\WindowID, "PanWin")
+ReadWindowPosition(#SettingsWindow, "OptWin")
 ReadPreferenceIntegerEX(System\RenderBack, "Render.BackColor", DefaultBackColor(), #White)
-EndMacro
-
-Macro LocateSettings() ; Partializer.
-Define X = ReadPreferenceInteger("OptWin.X", WindowX(#SettingsWindow))
-Define Y = ReadPreferenceInteger("OptWin.Y", WindowY(#SettingsWindow))
-ResizeWindow(#SettingsWindow, X, Y, #PB_Ignore, #PB_Ignore) ; Окно настроек.
 EndMacro
 
 Macro LoadHQFont(Index, FontName, FontSize, FontStyle) ; Pseudo-procedure.
@@ -1951,14 +2001,14 @@ WriteInteger(Filenum, CRC32Fingerprint(*Ptr, Size))
 EndProcedure
 
 Procedure WriteDataEx(*Pointer, Size) ; Replacer.
-DisableDebugger                                 ; Отключаем на всякий.
+DisableDebugger                                        ; Отключаем на всякий.
 Define *PackData = EncodeData(*Pointer, Size)
 If *PackData : Define PackSize = MemorySize(*PackData) ; Вот получаем размер...
-WriteInteger(0, PackSize)                       ; ...Вписываем его...
-WriteDataProtected(0, *PackData, PackSize)               ; ...И сами данные.
-FreeMemory(*PackData)                           ; Высвобождаем память.
+WriteInteger(0, PackSize)                              ; ...Вписываем его...
+WriteDataProtected(0, *PackData, PackSize)             ; ...И сами данные.
+FreeMemory(*PackData)                                  ; Высвобождаем память.
 Else : WriteInteger(0, 0) : WriteDataProtected(0, *Pointer, Size) : EndIf ; Или просто пишем.
-EnableDebugger                                  ; Ставим обратно, да-да.
+EnableDebugger                                         ; Ставим обратно, да-да.
 EndProcedure
 
 Macro DumpText(Text) ; Pseudo-procedure.
@@ -2033,11 +2083,13 @@ WriteInteger(0, *DataNode\Hotkey)   ; Вписываем клавишу.
 WriteInteger(0, *DataNode\CmpSize)  ; Вписываем запакованный размер.
 WriteInteger(0, *DataNode\Flattable); Вписываем флаг сжимаемости.
 WriteInteger(0, *DataNode\TimeStamp); Вписываем время получения.
+WriteInteger(0, *DataNode\RandFlag) ; Вписываем типоспецифичные флаги.
+WriteDataEx(*DataNode\VPSizing, SizeOf(Rect)) ; Вписываем размерность окна просмотра.
 DumpText(*DataNode\WSource)    ; Сохраняем название окна-источника.
 DumpText(*DataNode\Comment)    ; Сохраняем комментарий.
 DumpText(*DataNode\DictID)     ; Сохраняем ID для словаря.
 DumpText(GetListText(*DataNode)) ; Сохраняем текст для списка. Наконец-то.
-DumpSizing(*DataNode)           ; Вписываем размерность.
+DumpSizing(*DataNode)            ; Вписываем размерность.
 Select *DataNode\DataType ; В зависимости от типа...
 Case #CF_TEXT   : PackText(*DataNode\TextData)      ; Сохраняем текст.
 Case #CF_BITMAP : DumpImage()                       ; Сохраняем изображение.
@@ -2147,6 +2199,8 @@ If HotKey<0 Or HotKey>#HotKeys Or (Hotkey And System\HotNodes[HotKey]) :DumpErro
 *DataNode\CmpSize = ReadInteger(0)   ; Читаем ужатый размер.
 *DataNode\Flattable = ReadInteger(0) ; Читаем флаг сжимаемости.
 *DataNode\TimeStamp = ReadInteger(0) ; Читаем дату абсорбции.
+*DataNode\RandFlag  = ReadInteger(0) ; Читаем типоспецифичные флаги.
+ReadDataEx(*DataNode\VPSizing, SizeOf(Rect)) ; Восстанавливаем размерность окна просмотра.
 LoadText(*DataNode\WSource)          ; Читаем окно обретения.
 LoadText(*DataNode\Comment)          ; Читаем сам комментарий.
 LoadText(*DataNode\DictID)           ; Ну почему я изначально так не сделала ?
@@ -2595,15 +2649,17 @@ If SCText : ItemText + #TAB$ + SCText : EndIf : MenuItem(ItemIdx, ItemText)
 EndProcedure
 ; -----------------------------------------
 Macro CtrlSC(SC) ; Pseudo-procedure.
-"Ctrl+" + SC
+IIFS(Bool(SC <> ""), "Ctrl+" + SC, "")
 EndMacro
 
 Macro MenuItemCtrl(ItemIdx, ItemText, SC) ; Partializer
 MenuItemEx(ItemIdx, ItemText, CtrlSC(SC))
 EndMacro
 
-Macro SelAndCpy() ; Partializer.
-MenuItemCtrl(#vSelectAll, "Select All", "A") : MenuItemCtrl(#vCopyRaw,   "Raw Copy", "R")
+Macro SelAndRaw(SubGroup = "", RawDesc = "Copy->TXT", HotKey = "R") ; Partializer.
+MenuItemCtrl(#vSelectAll, "Select All", "A")
+CompilerIf SubGroup <> "" : OpenSubMenu(Subgroup) ; Если нужно - пакуем контектное меню.
+CompilerEndIf : MenuItemCtrl(#vCopyRaw, RawDesc, HotKey) 
 EndMacro
 
 Macro GetSel(Gadget, SelAccum) ; Pseudo-procedure.
@@ -2613,30 +2669,38 @@ EndMacro
 Macro SetSel(Gadget, SelAccum) ; Pseudo-procedure.
 SendMessage_(GadgetID(Gadget), #EM_EXSETSEL, 0, @SelAccum)
 EndMacro
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Macro ActualSelection(SelObj) ; Pseudo-procedure.
+SelObj\GetStringProperty("type") <> "None"
+EndMacro
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Procedure ViewPortMenu(*VPort.ViewPort)
+#SubHMTL = "Copy->{...}" ; Спец. константа
 If *VPort And *VPort\DataNode ; Такая вот проверка. Ну, может оно и верно.
 Define Type = *VPort\DataNode\DataType, Sel.CHARRANGE
 Define State = GetWindowState(*VPort\WindowID)
 CreatePopupMenu(#mVPMenu)
-If State = #PB_Window_Normal
+If State = #PB_Window_Normal ; Вне полноэкранного размера опций явно больше.
 MenuItemEx(#vMaximize,  "Maximize")
-MenuItemEx(#vStoreSize, "Store Size")
 MenuItemEx(#vCenterWin, "Win->Center")
-Else : MenuItemEx(#vReturnSize,  "Restore Size")
+Else : MenuItemEx(#vReturnSize,  "Restore Size") ; Унылый возврат прежнего размера.
 EndIf : MenuBar() 
 Select Type   ; Контекстные пункты...
-Case #CF_BITMAP, #CF_ENHMETAFILE ; Void.
-Case #CF_HTML : SelAndCpy() : MenuItemCtrl(#vCopy, "Copy->HTML", "Ins") : MenuBar()
-Default ; Текстовые данные.
-SelAndCpy() : MenuItemCtrl(#vCopy, "Copy->RTF", "Ins")
+Case #CF_BITMAP, #CF_ENHMETAFILE      ; Void.
+Case #CF_HTML : Define *SelObj.COMateObject = System\ViewPort\WebObject\GetObjectProperty("Document\Selection")
+If ActualSelection(*SelObj) : SelAndRaw(#SubHMTL, "Copy->TXT{raw}")  : MenuItemCtrl(#vCopyMD, "Copy->TXT{tags}", "M")
+MenuItemCtrl(#vCopy, "Copy->HTML", "Ins") : CloseSubMenu() ; HTML' special.
+Else : SelAndRaw("", #SubHMTL, "")  : DisableMenuItem(#mVPMenu, #vCopyRaw, #True)
+EndIf : MenuBar() : *SelObj\Release() ; Высвобождаем объект.
+Default                               ; --Текстовые данные.
+SelAndRaw() : MenuItemCtrl(#vCopy, "Copy->RTF", "Ins")
 GetSel(System\ViewPort\ViewArea, sel) ; Получаем тек. выделение.
 If Sel\CpMin=Sel\CpMax:DisableMenuItem(#mVPMenu,#vCopyRaw,#True):DisableMenuItem(#mVPMenu,#vCopy,#True):EndIf
 MenuBar()
 EndSelect ; И теперь оставшиеся (по большей части - общие) пункты:
 Select Type ; Спец. случай для переноса слов:
 Case #CF_TEXT, #CF_HDROP, #CF_RichText : MenuItemCtrl(#vWordWrap, "Word Wrap", "W") : MenuBar()    ; Перенос по словам.
-SetMenuItemState(#mVPMenu, #vWordWrap, *Vport\WrapFlag)                                            ; Ставим галочку, если вдруг.
+SetMenuItemState(#mVPMenu, #vWordWrap, Bool(Not *Vport\DataNode\WrapFlag))                         ; Ставим галочку, если вдруг.
 EndSelect : If Type = #CF_ENHMETAFILE : MenuItemEx(#vSaveSnap, "Render As...") : MenuBar() : EndIf ; Рендер метафайла.
 MenuItemCtrl(#vSaveAs, "Save As...", "S") : MenuItemEx(#vHighLight, "Find Source")
 If WindowWidth(*VPort\WindowID) = #VPortMinWidth And WindowHeight(*VPort\WindowID) = #VPortMinHeight
@@ -2652,6 +2716,10 @@ EndMacro
 Macro StoreVPIndex(VP) ; Pseudo-procedure.
 VP\PrevIndex = Str(Node2Index(VP\DataNode) + 1)
 EndMacro
+
+Macro ActualizeWordWrap(VP) ; Pseudo-procedure.
+SendMessage_(GadgetID(VP\ViewArea), #EM_SETTARGETDEVICE, #Null, VP\DataNode\WrapFlag)
+EndMacro
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Procedure WinCOMProc(object.COMateObject, eventName.s, parameterCount, *returnValue.VARIANT) ; Callback.
 Protected ObjEvent.COMateObject
@@ -2662,18 +2730,18 @@ Procedure FillVPData(*VP.OpticSys)
 With *VP        ; Старательно обратаываем нод.
 If *VP = System\Panopticum And *VP\Actual = #True : ProcedureReturn #False : EndIf ; Выходим, если нет смысла.
 Define *DataNode.ClipData = \DataNode ; Ускоряем доступ.
-If *DataNode ; Если порт вообще должен что-то показывать...
+If *DataNode    ; Если порт вообще должен что-то показывать...
 Select *DataNode\DataType ; Выбираем по типу.
-Case #CF_TEXT, #CF_HDROP : SetGadgetText(\ViewArea, ExtractText(\DataNode))
-Case #CF_BITMAP      : \Img = ExtractImage(*DataNode)
-Case #CF_ENHMETAFILE : \TempMeta = ExtractMeta(*DataNode)
-Case #CF_RichText    : Define *DPtr = ExtractComplexData(*DataNode) : SetGadgetText(\ViewArea, PeekRTF(*DataNode, *DPtr))
-CleanAfter(*DataNode, *DPtr)
-Case #CF_HTML        : Define *HPoint = ExtractComplexData(*DataNode) ; Извлекаем данные для заполнения.
-ParseHTML(*VP\WebObject, *HPoint) : CleanAfter(*DataNode, *HPoint)    ; Парсим HTML.
-*VP\WinCom = *VP\WebObject\GetObjectProperty("Document\Parentwindow") ; Получаем родительское окно.
+Case #CF_TEXT, #CF_HDROP : SetGadgetText(\ViewArea, ExtractText(\DataNode)) : ActualizeWordWrap(*VP)
+Case #CF_BITMAP          : \Img = ExtractImage(*DataNode)
+Case #CF_ENHMETAFILE     : \TempMeta = ExtractMeta(*DataNode)
+Case #CF_RichText        : Define *DPtr = ExtractComplexData(*DataNode)     : SetGadgetText(\ViewArea, PeekRTF(*DataNode, *DPtr))
+CleanAfter(*DataNode, *DPtr)                                                : ActualizeWordWrap(*VP)  
+Case #CF_HTML            : Define *HPoint = ExtractComplexData(*DataNode) ; Извлекаем данные для заполнения.
+ParseHTML(*VP\WebObject, *HPoint) : CleanAfter(*DataNode, *HPoint)        ; Парсим HTML.
+*VP\WinCom = *VP\WebObject\GetObjectProperty("Document\Parentwindow")     ; Получаем родительское окно.
 *VP\WinCom\SetEventHandler(#COMate_CatchAllEvents, @WinCOMProc(), #COMate_OtherReturn)
-EndSelect : If *VP = System\Panopticum : *VP\Actual = #True : EndIf   ; Ставим флажок актуальности.
+EndSelect : If *VP = System\Panopticum : *VP\Actual = #True : EndIf       ; Ставим флажок актуальности.
 EndIf
 EndWith
 EndProcedure
@@ -2871,11 +2939,18 @@ Macro SetContain(Stab) ; Pseudo-procedure.
 If FaultyOS() : Stab\Container = ContainerGadget(#PB_Any, 0, 0, 0, 0)  : EndIf
 EndMacro
 ;;;;;;;;;;;;;;;;;;;;;;
-Macro InitVPWindow(WinAccum, Stab, WWidth = System\VPWidth, WHeight = System\VPHeight) ; Pseudo-procedure.
-WinAccum = OpenWindow(#PB_Any,0,0,System\VPWidth,System\VPHeight,"",#VPFlags,System\MainWindow)
+Macro InitVPWindow(WinAccum, Stab, Sizer = System\VoidBorders) ; Pseudo-procedure.
+Define Sizing.Rect = Sizer         ; Аккумулируем полученные данные о границах окна.
+If Sizing\Right <= 0 And Sizing\Bottom <= 0 : Sizing\Right = -Sizing\Right : Sizing\Bottom = -Sizing\Bottom ; Инвертируем, да.
+Define CFlag = #PB_Window_WindowCentered : Else : CFlag = #False     : EndIf ; Устанавливаем по центру только при инциализации.
+If Sizing\Right  < #VPortMinWidth  : Sizing\Right  = #VPortMinWidth  : EndIf ; Проверяем на соответсвие минимальным ширине...
+If Sizing\Bottom < #VPortMinHeight : Sizing\Bottom = #VPortMinHeight : EndIf ; ...и высоте...
+WinAccum = OpenWindow(#PB_Any, #PB_Ignore, #PB_Ignore, Sizing\Right, Sizing\Bottom, "", #VPFlags|CFlag, System\MainWindow)
 SmartWindowRefresh(WinAccum, #True) : SmartWindowRefresh(WinAccum, #True)       ; Добавочная подготовка.
 WindowBounds(WinAccum, #VPortMinWidth, #VPortMinHeight, #PB_Ignore, #PB_Ignore) ; Ограничители размера.
-SetContain(Stab)
+If CFlag = 0 : PlaceWindowStrict(WinAccum, Sizing\Left, Sizing\Top)             ; Выставляем на заранее определенной позиции.
+Else  : ResizeWindow(WinAccum, WindowX(WinAccum)+ShakeRnd(), WindowY(WinAccum)+ShakeRnd(), #PB_Ignore, #PB_Ignore) ; Иначе трясем.
+EndIf : SetContain(Stab)
 EndMacro
 
 Macro ActivateVP(VPort) ; Pseudo-procedure.
@@ -2896,8 +2971,8 @@ SendMessage_(WindowID(*Window), System\UpdateMsg, 0, 0) ; Отправлем с�
 AddKeyboardShortcut(*Window,#VK_OEM_PLUS,#vSizeUp) : AddKeyboardShortcut(*Window,#VK_OEM_MINUS,#vSizeDown) ; Shortcuts:
 AddKeyboardShortcut(*Window,#VK_OEM_MINUS|#PB_Shortcut_Shift,#vSizeDown)   ; Чисто для комплекта, на самом деле минус.
 ViewPortShort(Add, #vSizeUp, 0) : ViewPortShort(Subtract, #vSizeDown, 0)   ; +/- к размерам окна.
-ViewPortShort(S, #vSaveAs) : ViewPortShort(R, #vCopyRaw) ; Дополнительная функциональность / Сохранение в "чистом" виде.
-ViewPortShort(W, #vWordWrap)                             ; Включение и отключение переноса по словам.
+ViewPortShort(S, #vSaveAs) : ViewPortShort(R, #vCopyRaw)  ; Схоронение в файл / Копирование в "чистом" виде.
+ViewPortShort(M, #vCopyMD) : ViewPortShort(W, #vWordWrap) ; Копирование с разметкой / Включение и отключение переноса по словам.
 SetupBuffers(VPort\Stabilizer, GoesHTML(VPort)) : BindWP(GadgetID(VPort\Stabilizer\Container), VPort)
 EndMacro
 ;;;;;;;;;;;;;;;;;;;;;;
@@ -2912,7 +2987,7 @@ Procedure OpenViewPort(NodeIdx)
 If NodeIdx <> #UnusedNode ; Если есть, что показывать...
 Define *Window, *Gadget, *VPort.ViewPort, *DataNode.ClipData = Index2Node(NodeIdx), iid.IID
 If *DataNode\Viewport = #Null : UnhideList() ; Если еще не ассоциировано Viewport'а.
-AddElement(System\ViewPorts()) : *VPort = System\ViewPorts() : InitVPWindow(*Window, *VPort\Stabilizer) 
+AddElement(System\ViewPorts()) : *VPort = System\ViewPorts() : InitVPWindow(*Window, *VPort\Stabilizer, *DataNode\VPSizing) 
 *VPort\WindowID = *Window : *VPort\DataNode = *DataNode                       ; Основная линковка.
 NameVP(*VPort) : Select *DataNode\DataType                                    ; Выбираем по типу данных...
 Case #CF_TEXT, #CF_HDROP : PlainEditorial()                                   ; --Text.
@@ -2922,7 +2997,6 @@ Case #CF_ENHMETAFILE : MetaPort()                                             ; 
 Case #CF_HTML        : WebPort()                                              ; --HyperText Markup.
 EndSelect : *VPort\ViewArea = *Gadget : FillVPData(*VPort) : ConfigureVP(*VPort) ; Вписываем отображаемые данные.
 UpdateInformer(*VPort\Informator) : *VPort\DataNode\ViewPort = *VPort            ; Вписываем данные информационной строки.
-ResizeWindow(*Window, WindowX(*Window)+ShakeRnd(), WindowY(*Window)+ShakeRnd(), #PB_Ignore, #PB_Ignore)
 EndIf : UnhideList() : ActivateVP(*DataNode\ViewPort)  ; Активируем и показываем в любом случае, кстати.
 EndIf
 EndProcedure
@@ -3042,8 +3116,8 @@ EndProcedure
 
 Procedure.s Format2Template(Format, *DataNode.ClipData = #Null)
 #RasterShared = "PNG image (*.png)|*.png"
-#TextPattern = "Text file (*.txt)|*.txt"
-#AllFilez = "|All files (*.*)|*.*"
+#TextPattern  = "Text file (*.txt)|*.txt"
+#AllFilez     = "|All files (*.*)|*.*"
 Select Format ; Выбираем по формату.
 Case #CF_TEXT, #CF_HDROP : ProcedureReturn #TextPattern ; UTF-8 text.
 Case #CF_HTML            : ProcedureReturn "HTML page (*.html)|*.html|"    + #TextPattern
@@ -3052,12 +3126,17 @@ Case #CF_ENHMETAFILE     : Define Result.s = "Enchanced meta-file (*.emf)|*.emf"
 If *DataNode\Sizing\X > 0 And *DataNode\Sizing\Y > 0 ; Если оно там пригодно к рендеру...
 Result + "|" + #RasterShared : EndIf : ProcedureReturn Result ; Возвращаем результат.
 Case #CF_BITMAP          ; Most complex one:
-ProcedureReturn #RasterShared + "|JPEG image (*.jpg)|*.jpg|JPEG2000 image (*.jp2)|*.jp2}|BMP image (*.bmp)|*.bmp"
+ProcedureReturn #RasterShared + "|JPEG image (*.jpg)|*.jpg|JPEG2000 image (*.jp2)|*.jp2|BMP image (*.bmp)|*.bmp"
 EndSelect
 EndProcedure
 
-Macro AddExtension(FName, Ext, Pattern, Target = 0) ; Pseudo-procedure
-If Pattern = Target And "." + LCase(GetExtensionPart(FName)) <> Ext : Fname + Ext : EndIf
+Procedure.s Pattern2Extension(Pattern.s, PatternIdx.i)
+Define Ext.s = GetExtensionPart(StringField(Pattern, (PatternIdx + 1) * 2, "|"))
+If Ext <> "*" : ProcedureReturn Ext : EndIf
+EndProcedure
+
+Macro AddExtension(FName, Ext) ; Pseudo-procedure
+If "." + LCase(GetExtensionPart(FName)) <> Ext : Fname + IIFS(Bool(Ext), ".", "") + Ext : EndIf
 EndMacro
 
 Procedure WriteText(Text.s) ; Replacer
@@ -3082,12 +3161,8 @@ EndSelect
 EndWith
 EndProcedure
 
-Macro SaveAsText(FName, Node, Pattern, Target = 0) ; Partializer.
-AddExtension(FName, ".txt", Pattern, Target) : CreateFile(0, FName) : WriteString(0, PrettyPrinter(Node)) : CloseFile(0)
-EndMacro
-
-Macro SaveAsPNG(FileName, Pattern, Target = Pattern, Image = #TempImage) ; Partializer.
-AddExtension(FileName,".png",Pattern,Target) : SaveImage(Image, FileName, #PB_ImagePlugin_PNG)
+Macro SaveAsText(FName, Node) ; Partializer.
+CreateFile(0, FName) : WriteString(0, PrettyPrinter(Node)) : CloseFile(0)
 EndMacro
 
 Macro TransformationBegin(Node, NewType) ; Partializer.
@@ -3178,7 +3253,10 @@ Define DataNode()
 CreatePopupMenu(#mListMenu)
 MenuItemCtrl(#cThrowUp,   "Throw Up"   , "PgUp")
 MenuItemCtrl(#cThrowDown, "Throw Down" , "PgDn")
-MenuBar()
+MenuBar() : OpenSubMenu("Bind Node")
+For I = 1 To #Hotkeys : MenuItemEx(#cBindData + I, "Ctrl+" + Str(I)) ; Проходимся по всем нодам.
+If *DataNode\Hotkey = I : SetMenuItemState(#mListMenu, #cBindData + I, #True) : EndIf
+Next I : CloseSubMenu() ; ...А теперь продолжаем нашу рутину:
 MenuItemCtrl(#cViewData, "View Data", "V")
 MenuItemCtrl(#cSaveAs  , "Save As...", "S")
 MenuBar()
@@ -3190,7 +3268,7 @@ Case #CF_TEXT        : MenuItemEx(#cListerate, "STR->DIR") : MenuItemCtrl(#cQWER
 EndSelect ; Продолжаем...
 MenuItemCtrl(#cSetcomment, "Set Remark", "R") : MenuItemEx(#cRemove, "Remove", "Del")
 If NodeIdx = 0 : DisableMenuItem(#mListMenu, #cThrowUp, #True) : EndIf ; Убиваем у первого.
-If NodeIdx = CountGadgetItems(#ClipList) - 1              ; Если это последний элемент...
+If NodeIdx = CountGadgetItems(#ClipList) - 1            ; Если это последний элемент...
 DisableMenuItem(#mListMenu, #cThrowDown, #True)         ; Бросать тоже нельзя.
 EndIf : DisplayPopupMenu(#mListMenu, System\MainWindow) ; Отображаем результат.
 EndIf
@@ -3199,57 +3277,62 @@ EndMacro
 Procedure SaveAs(NodeIdx.i, *ForcedRes.Point = #Null) ; !Menu handler.
 If UsedNode() ; Если есть, что сохранять...
 Define Idx, FileName.s, DataNode(), NoPNG = #False, *UCData
-If *ForcedRes : Define Template.s = #RasterShared + #AllFilez ; Шаблон рендера.
+If *ForcedRes : Define Template.s = #RasterShared + #AllFilez                         ; Шаблон рендера.
 Else : Template = Format2Template(*DataNode\DataType, *DataNode) + #AllFilez          ; Получаем необходимый шаблон.
 EndIf : If *DataNode\DataType = #CF_ENHMETAFILE And FindString(Template, "PNG", 1)=0 : NoPNG = 10 : EndIf
-Define NodeID.s = DialogID(*DataNode\DataType,NodeIdx) ; Получаем идентификатор.
+Define NodeID.s = DialogID(*DataNode\DataType,NodeIdx)                                ; Получаем идентификатор.
 If *ForcedRes : NodeID + " @ " + Str(*ForcedRes\X) + "x" + Str(*ForcedRes\Y) : EndIf  ; Форсим размеры, если просят.
 If *DataNode\DataType = #CF_BITMAP : Idx = System\RasterType : Else : Idx = 0 : EndIf ; Уточняем, что сохраняется растр.
 System\LockedNode = *DataNode          ; Схороняем для валидации.
 TakeFocus() : UnhideList()             ; Дабы все отображалось.
 FileName = Trim(SaveFileRequester("Locate saving destination for "+NodeID+"..."+#CRLF$,NodeID,Template,Idx))
-ResumeFocus()                          ; ДАбы фокус не совсем уж сбивался...
-If FileName                            ; Если есть, куда сохранять...
+; ----------------------------------------------------
+If FileName : Define Pattern = SelectedFilePattern()         ; Сохраняем позицию о шаблоне расширений.
+AddExtension(FileName, Pattern2Extension(Template, Pattern)) ; Добиваем расширение. На проверку, не иначе.
+If FileSize(FileName) => 0 And WarnBox("are you sure to overwrite '" + GetFilePart(FileName) + "' ?") = #PB_MessageRequester_No
+DelayReturn() : EndIf                  ; Спасение от перезаписи.
+Else : DelayReturn() : EndIf           ; Если ничего не выбрали - сходу на выход.
+; ----------------------------------------------------
+ResumeFocus() : ReviseReturn()         ; Дабы фокус не совсем уж сбивался...
 If System\LockedNode <> #Null          ; Если за это время нод не убился циклом....
 Define Pattern = SelectedFilePattern() ; Сохраняем позицию.
 Select *DataNode\DataType              ; Выбираем по формату...
-Case #CF_TEXT        : SaveAsText(FileName, *DataNode, Pattern)                   ; Текстовый файл.
-Case #CF_RichText    : If Pattern <> 1 : AddExtension(FileName, ".rtf", Pattern)  ; Файл RTF.
-*UCData = ExtractComplexData(*DataNode)                                           ; Экстракция данных на случай сжатия.
+Case #CF_TEXT        : SaveAsText(FileName, *DataNode)                            ; Текстовый файл.
+Case #CF_RichText    : If Pattern <> 1 : *UCData = ExtractComplexData(*DataNode)  ; Файл RTF.
 CreateFile(0, FileName) : WriteData(0, *UCData, MemorySize(*UCData)) : CloseFile(0) ; Схороняем.
 CleanAfter(*DataNode, *UCData)                                                    ; Убиваем буфер
-Else : SaveAsText(FileName, *DataNode, Pattern, 1) : EndIf                        ; Сохраняем как простой текст.
-Case #CF_HTML        : If Pattern <> 1 : AddExtension(FileName, ".html", Pattern) ; Страница HTML.
-*UCData = ExtractComplexData(*DataNode)                                           ; Экстракция данных на случай сжатия.
-CreateFile(0,FileName) : WriteString(0, FindBody(*UCData)) : CloseFile(0)         ; Схороняем.
+Else : SaveAsText(FileName, *DataNode) : EndIf                                    ; Сохраняем как простой текст.
+Case #CF_HTML        : If Pattern <> 1 : *UCData = ExtractComplexData(*DataNode)  ; Страница HTML.
+CreateFile(0, FileName) : WriteString(0, FindBody(*UCData)) : CloseFile(0)        ; Схороняем.
 CleanAfter(*DataNode, *UCData)                                                    ; Убиваем буфер
-Else : SaveAsText(FileName, *DataNode, Pattern, 1) : EndIf                        ; Сохраняем как простой текст.
-Case #CF_HDROP       : SaveAsText(FileName, *DataNode, Pattern)                   ; Текстовый листинг.
+Else : SaveAsText(FileName, *DataNode) : EndIf                                    ; Сохраняем как простой текст.
+Case #CF_HDROP       : SaveAsText(FileName, *DataNode)                            ; Текстовый листинг.
 ;--------------------------------------
-Case #CF_ENHMETAFILE : If *ForcedRes = #Null ; Стандартное сохранение.
-AddExtension(FileName, ".emf", Pattern)      ; Метафайл.
-Select Pattern ; Анализируем целевой формат.
-Case 1+NoPng : RenderMetafile(*DataNode, #TempImage) : SaveAsPNG(FileNAme, Pattern) : FreeImage(#TempImage)
-Default ; Сохраняем, что называется, as is.
-CreateFile(0, FileName) : MetaSelect() ; Аллокация (мета)файлов.
+Case #CF_ENHMETAFILE : If *ForcedRes = #Null                                      ; Стандартное сохранение.
+Select Pattern                                                                    ; Анализируем целевой формат.
+Case 1 + NoPng : RenderMetafile(*DataNode, #TempImage)                            ; Рендерим метафайл в BMP.
+SaveImage(#TempImage, FileName, #PB_ImagePlugin_PNG) : FreeImage(#TempImage)      ; Записываем полученное изображение.
+Default                                                                           ; Сохраняем, что называется, as is.
+CreateFile(0, FileName) : MetaSelect()                                            ; Аллокация (мета)файлов.
 GetMetaHeader(*MetaIDX) : GetMetaBits(*MetaIDX) : WriteData(0, *RawData, *DataNode\DataSize) ; Вписываем все.
-FreeMemory(*RawData) : MetaCheckUP() : CloseFile(0)           ; Деллокация (мета)файлов.
+FreeMemory(*RawData) : MetaCheckUP() : CloseFile(0)                               ; Деаллокация (мета)файлов.
 EndSelect ; Теперь рендер...
-Else : RenderMetafile(*DataNode, #TempImage, *ForcedRes) : SaveAsPNG(FileName, Pattern, 0) : FreeImage(#TempImage)
+Else : RenderMetafile(*DataNode, #TempImage, *ForcedRes) : SaveImage(#TempImage, FileName, #PB_ImagePlugin_PNG)
+FreeImage(#TempImage)                                                             ; Высвобождаем память временного изображения.
 EndIf     ; Продолжаем.
 ;--------------------------------------
 Case #CF_BITMAP : If Pattern <> 4 : System\RasterType = Pattern : EndIf ; Raster images.
-ImgSelect()    ; Теперь так.
-Select Pattern ; Вновь анализируем формат.
-Case 0 : SaveAsPNG(FileName, Pattern, Pattern, ImgIDx) ; PNG.
-Case 1 : AddExtension(FileName,".jpg",Pattern,Pattern) : SaveImage(ImgIDx, FileName, #PB_ImagePlugin_JPEG)
-Case 2 : AddExtension(FileName,".jp2",Pattern,Pattern) : SaveImage(ImgIDx, FileName, #PB_ImagePlugin_JPEG2000)
-Case 3 : AddExtension(FileName,".bmp",Pattern,Pattern) : SaveImage(ImgIDx, FileName) ; Raw bitmap.
-Default : SaveImage(ImgIDx, FileName, #PB_ImagePlugin_PNG)                           ; All Files
-EndSelect : ImgCheckUP()                                                             ; Будет так, все одно лучше.
-EndSelect
+Define Format  : ImgSelect() ; Теперь так.
+Select Pattern ; Вновь анализируем формат и выводим отуда плагин:
+Case 0  : Format = #PB_ImagePlugin_PNG
+Case 1  : Format = #PB_ImagePlugin_JPEG
+Case 2  : Format = #PB_ImagePlugin_JPEG2000
+Case 3  : Format = #PB_ImagePlugin_BMP
+Default : Format = #PB_ImagePlugin_PNG
+EndSelect : SaveImage(ImgIDx, FileName, Format) : ImgCheckUP() ; Будет так, все одно лучше.
+EndSelect ; Выодим ошибку, если вдруг за это время уже снесло:
 Else : ErrorBox("unable to save data from deleted node !" + #ReconMsg) : ResumeFocus()
-EndIf : EndIf : EndIf
+EndIf : EndIf
 EndProcedure
 
 Macro SaveScaled(ViewPort, Index) ; !Menu handler.
@@ -3411,37 +3494,48 @@ RenumSignal(NodeIdx) : HLLine(NewIdx) ; Ставим выделение.
 EndIf
 EndProcedure
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Macro NotHTMLView(VP = System\ViewPort) ; Partializer
+(VP\DataNode\DataType <> #CF_HTML)
+EndMacro
+
 Procedure SelectAllHTML(*VPort.ViewPort)
+If Not NotHTMLView() ; Проверяем, дабы было не повадно.
 With *Vport
 \WebObject\Invoke("Document\body\CreateTextRange()\Select()")
 EndWith
+EndIf
 EndProcedure
 
 Procedure HTMLAsRaw(*VPort.ViewPort)
+If Not NotHTMLView() ; Проверяем, дабы было не повадно.
 Define Plain.s = GetGadgetItemText(*VPort\ViewArea, #PB_Web_SelectedText)
 If Plain : SetClipboardText(Plain) : EndIf
+EndIf
 EndProcedure
 
-Procedure HTMLasHTML(*VPort.ViewPort)
+Procedure HTMLasHTML(*VPort.ViewPort, TextForm = #False)
 With *Vport
-Define *SelObject.COMateObject = \WebObject\GetObjectProperty("Document\Selection\CreateRange()")
+If Not NotHTMLView() ; Проверяем, дабы было не повадно.
+Define *SelObject.COMateObject = \WebObject\GetObjectProperty("Document\Selection")
+Define *RangeObject.COMateObject = *SelObject\GetObjectProperty("CreateRange()")
 ; =-----------
-If *SelObject ; Если все прошло успешно.
-ClipHTML(*SelObject\GetStringProperty("htmlText"), *SelObject\GetStringProperty("Text"))
-*SelObject\Release() : EndIf ; Высвобождаем.
+If *RangeObject ; Если все прошло успешно.
+If ActualSelection(*SelObject) ; Проверяем, вдруг там ничего не выделено.
+If TextForm = #False  : ClipHTML(*RangeObject\GetStringProperty("htmlText"), *RangeObject\GetStringProperty("Text"))
+Else : SetClipboardText(*RangeObject\GetStringProperty("htmlText")) : EndIf ; Копируем как набор тегов.
+EndIf : *RangeObject\Release() : *SelObject\Release() : EndIf : EndIf ; Высвобождаем.
 ; =-----------
 EndWith
 EndProcedure
 
 Procedure RTFASRaw(*VPort.ViewPort)
+If IsTextNode(*VPort\DataNode) ; Проверяем, вдруг оно не RTF.
 Protected marked.CHARRANGE , Txt.s, *RED = GadgetID(*VPort\ViewArea)
-SendMessage_(*RED, #EM_EXGETSEL, 0, @marked) : Txt = Space(1 + marked\cpMax - marked\cpMin) 
-If Txt : SendMessage_(*RED, #EM_GETSELTEXT, 0, @Txt) : SetClipboardText(txt) : EndIf
+SendMessage_(*RED, #EM_EXGETSEL, 0, @marked) 
+If (marked\cpMax - marked\cpMin) : Txt = Space(1 + marked\cpMax - marked\cpMin) 
+SendMessage_(*RED, #EM_GETSELTEXT, 0, @Txt) : SetClipboardText(txt) : EndIf
+EndIf
 EndProcedure
-
-Macro NotHTMLView() ; Partializer
-(System\ViewPort\DataNode\DataType <> #CF_HTML)
-EndMacro
 
 Procedure Cursor2Node(*Pos.Point = #Null) ; 2be redone.
 Define Area.Rect, Cursor.Point, ItemWidth, Item
@@ -3470,23 +3564,29 @@ EndSelect ; Вызываем старый обработчик:
 ProcedureReturn ChainOldCB()
 EndProcedure
 
-Macro HKNode() ; Partializer.
-Node2Index(System\HotNodes[KeyIdx])
+Macro HKNode(KI = KeyIdx) ; Partializer.
+Node2Index(System\HotNodes[KI])
 EndMacro
 
-Macro UpHoldSelection() ; Partializer.
-If System\HotNodes[KeyIdx] : HLLine(HKNode()) : Else : HLLine(State) : EndIf 
+Macro UpHoldSelection(KI = KeyIdx, NI = State) ; Partializer.
+If System\HotNodes[KI] : HLLine(HKNode()) : Else : HLLine(NI) : EndIf 
 EndMacro
 
 Macro SelectUsed() ; Partializer.
 HLLine(USedNodeIdx())
 EndMacro
-
+;;;;;;;;---------
+Procedure BindNode(NodeIdx, KeyIdx)
+If UsedNode() : LinkHotkey(NodeIdx, KeyIdx)                       ; Линкуем клавишу.
+If OverLoad(CountGadgetItems(#ClipList)) : CheckMaximum() : EndIf ; Проверяем перегрузку. Да, так надо.
+EndIf
+EndProcedure
+;;;;;;;;---------
 Procedure AnalyzeHotkey(KeyIdx)
 Define AG = GetActiveGadget()
-EnterCritical() ; Блюдем скорость отрисовки.
+EnterCritical()                                            ; Блюдем скорость отрисовки.
 Define State = GetGadgetState(#ClipList)
-Select KeyIdx ; Анализируем введенную клавишу...
+Select KeyIdx                                              ; Анализируем введенную клавишу...
 Case #BringKey : UnhideList() : DisableDebugger : ReturnWindow() : EnableDebugger ; Вызываем окно на экран.
 Case #SwapKey  : SwapLayout(UsedNodeIdx())                 ; Вроде как, меняем раскладку.
 Case #SaveKey  : SelectUsed()                              ; Выделяем-таки.
@@ -3496,8 +3596,7 @@ Case #Hype+1 To #Hype + #Hotkeys : KeyIdx - #Hype          ; Клавиши го
 LinkHotkey(UsedNodeIdx(), KeyIdx, #True) : SelectUsed()    ; Линкуем и ставим выделение.
 Case 1 To #HotKeys                                         ; Клавиши горячие. То, ради чего все и делалось.
 If AG <> #SearchBar                                        ; Ничего не делаем, пока активна строка поиска.
-If GetActiveWindow() = #MainWindow : LinkHotkey(GetGadgetState(#ClipList), KeyIdx) ; Линкуем клавишу.
-If OverLoad(CountGadgetItems(#ClipList)) : CheckMaximum() : EndIf ; Проверяем перегрузку. Да, так надо.
+If GetActiveWindow() = #MainWindow : BindNode(GetGadgetState(#ClipList), KeyIdx) ; Перевязываем нод к клавише.
 ElseIf System\HotNodes[KeyIdx]                             ; Если там еще есть, что выделять...
 RestoreData(HKNode()) : EmulatePasting() : EndIf           ; Восстанавливаем данные.
 UpHoldSelection() : EndIf                                  ; Блюдем выделение.
@@ -3951,6 +4050,7 @@ EndProcedure
 Macro SelSBar() ; Partializer.
 SearchBarCallBack(System\SearchBar, #WM_SETFOCUS, 0, 0)
 EndMacro
+
 Procedure SearchBarCallBack(hWnd, Message, wParam, lParam) ; Callback.
 Select Message ; Анализируем входящие сигналы...
 Case #WM_LBUTTONDBLCLK : SetSimpleSel(#SearchBar, 0, -1) : ProcedureReturn #False ; Выделяем все. Удобно же.
@@ -3971,8 +4071,8 @@ CloseSubMenu() : OpenSubMenu("Text analysis")                            ; Вс�
 EmitterItem(#sfCase, "Sensitive to *", #sfNoCase) : EmitterItem(#sfNoCase, "Sensitive to no *", #sfCase) ; Текстовые флагов.
 EmitterItem(#sfWhole , "Equals to * source")      : EmitterItem(#sfRegular, "Match *ular expression")    ; Еще немного флагов.
 CloseSubMenu() : OpenSubMenu("Misc flagi") : EmitterItem(#sfOpen, "* findings") : EmitterItem(#sfNot, "* equality") ; Побочные флаги.
-EmitterItem(#sfSel, "Auto-*ect results", #sfNoSel) : EmitterItem(#sfNoSel, "Supress *ection", #sfSel) ; Дополнительные флаги.
-EmitterItem(#sfHKBound, "Hotkey-* only", #sfHKUnBound) : EmitterItem(#sfHKUnBound, "Hotkey-un* only", #sfHKBound) ; По нодам.
+EmitterItem(#sfSel, "Auto-*ect results", #sfNoSel) : EmitterItem(#sfNoSel, "Supress *ection", #sfSel)    ; Дополнительные флаги.
+EmitterItem(#sfHKBound, "Hotkey-* only", #sfHKUnBound) : EmitterItem(#sfHKUnBound, "Hotkey-un* only", #sfHKBound)   ; По нодам.
 CloseSubMenu() : CloseSubMenu() : OpenSubMenu("Emit reparser code") ; Отдельная категория для эмиттера заменяемых символов.
 MenuItemEX(#dTAB, "Alt+009 (TAB)") : MenuItemEX(#dLF, "Alt+010 (LF)") : MenuItemEX(#dCR, "Alt+013 (CR)") ; Основной набор.
 CloseSubMenu() : MenuBar() ; Финальный разделитель перед остаточной частью меню.
@@ -3990,8 +4090,8 @@ Procedure EmitSymbol(*SBar, MenuIndex)
 ; -----------
 Select MenuIndex
 Case #dTAB : Define OutSeq.s = #TAB$ ; Выдаем табулятор.
-Case #dLF  : OutSeq = #LF$  ; Выдаем возврат строки.
-Case #dCR  : OutSeq = #CR$  ; Выдаем перенос строки.
+Case #dLF  : OutSeq = #LF$   ; Выдаем возврат строки.
+Case #dCR  : OutSeq = #CR$   ; Выдаем перенос строки.
 EndSelect  : Define Min, Max ; Корректоры.
 Dim Offset(0) : GetSimpleSel(*SBar, Min, MAx)
 Define RepText.s = ReparseRequest(System\ActualReq, Offset())
@@ -4099,7 +4199,7 @@ EndSelect : If *Host : *DataNode = *Host : EndIf ; Ну, посмотрим, ч�
 EndIf : EndWith ; А теперь - перемещаем результат на положенное ему место:
 Define *Target.ClipData = Cursor2Node(DPoint), SrcIdx = Node2Index(*DataNode), Mode
 If *Target : If Node2Index(*Target) < SrcIdx : Mode = #PB_List_Before : Else : Mode = #PB_List_After : EndIf  ; Выбираем режим переноса.
-ThrowNode(SrcIdx, Mode, *Target) : Else : ThrowNode(SrcIdx) : HLLine(CountGadgetItems(#ClipList) - 1) : EndIf ; ...Или просто кидаем в конец, да.
+ThrowNode(SrcIdx, Mode, *Target) : Else : ThrowNode(SrcIdx) : HLLine(CountGadgetItems(#ClipList) - 1) : EndIf ; ...Или кидаем в конец, да.
 EndProcedure
 
 Procedure GadgetDrop() ; Bindback.
@@ -4270,21 +4370,20 @@ EmuCase(#cDelete, Delete, #VK_DELETE)                           ; Стандар
 Case #cReturn : System\Lurker\ToGadget = #SearchBar             ; Уточняем, что надо вернуться к строке.
 If InitSearch() = #False : System\Lurker\ToGadget = 0 : EndIf   ; Убираем в 0, дабы не смешивалось.
 Case #cCtrlA, #sSelectAll  : SetSimpleSel(#SearchBar, 0, -1)                 ; Выделяем все содержимое. Целиком.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Case #cCtrlV, #sPaste      : SelSBar() : SendMessage_(System\SearchBar, #WM_PASTE, 0, 0) ; Выделяем все содержимое. Целиком.
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 Case #cCopy , #sCopy       : SendMessage_(System\SearchBar, #WM_COPY , 0, 0) ; Стандарт для клавиш восстановления.
 Case #sClear               : SendMessage_(System\SearchBar, #WM_CLEAR, 0, 0) ; Очищаем выделение.
 Case #sCut                 : SendMessage_(System\SearchBar, #WM_CUT  , 0, 0) ; Вырезаем выделенное.
 Default   : ProcedureReturn #False ; Если ничего не узнали - надо продолжать обработку.
 EndSelect : ProcedureReturn #True  ; Узнали, вот да.
 EndProcedure
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;-----------------------
 Procedure SetWordWrap(*VP.ViewPort, WrapFlag.i)
-*VP\WrapFlag = Bool(WrapFlag) ; Выставляем значение флага.
-SendMessage_(GadgetID(*VP\ViewArea), #EM_SETTARGETDEVICE, #Null, Bool(Not WrapFlag))
+If isTextNode(*VP\DataNode) ; Проверяем, дабы было не повадно.
+WrapFlag = Bool(WrapFlag) : *VP\DataNode\WrapFlag = WrapFlag : ActualizeWordWrap(*VP)  ; Выставляем значение флага.
+EndIf
 EndProcedure
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;-----------------------
 Procedure UseMenu() ; Bindback.
 Define AG = GetActiveGadget(), Item = EventMenu() ; Заранее.
 If (AG = #SearchBar Or Item > #sSearchMenuEdge) And ProcessSearchBar(#SearchBar, Item) ; Совсем отдельный случай...
@@ -4292,7 +4391,7 @@ SAG(#SearchBar) : ProcedureReturn : EndIf                                       
 EnterCritical() ; Блюдем скорость отрисовки.
 Define NodeIdx = GetGadgetState(#ClipList), X, Y, sel.CHARRANGE
 ; Актуализируем пункты меню:
-Select Item ; Анализируем пункты...
+Select Item; Анализируем пункты...
 Case #tShowWindow : ReturnWindow() ; Показать окно программы.
 Case #tOptions    ; Показать окно настроек.
 If IsWindowVisible_(System\SetupWindow) : SetForegroundWindow_(System\SetupWindow) : Else : BringOptions() : EndIf
@@ -4307,16 +4406,16 @@ Case #cMoveDown   : SwapNodes(NodeIdx, NodeIdx + 1)
 Case #cSaveAs     : SaveAs(NodeIdx)
 Case #cFlatten    : ComplexText2STR(NodeIdx)
 Case #cRender     : MetaFile2BMP(NodeIdx)
-Case #cOptions    : BringOptions()                                                ; Virtual item.
-Case #cPanopticum : BringPanopticum() ; Virtual item.
+Case #cOptions    : BringOptions()              ; Virtual item.
+Case #cPanopticum : BringPanopticum()           ; Virtual item.
 Case #cSetComment : AskNodeComment(NodeIdx)
 Case #cThrowDown  : ThrowNode(NodeIdx)          ; Кидаем вниз, вот да.
 Case #cThrowUp    : ThrowNode(NodeIdx, #PB_List_First)  ; Подкидываем.
 Case #cQWERTYSwap : SwapLayout(NodeIdx)         ; Меняем раскладку.
 Case #cListerate  : ProduceListing(NodeIdx)     ; Превращаем текст в листинг
+Case #cBindData To #cBindData + #HotKeys : Define KeyIdx.i = Item - #cBindData 
+BindNode(NodeIdx, KeyIdx) : UpHoldSelection(KeyIdx, NodeIdx) ; Привязываем данные к клавише.
 ; ...и меню контекста Viewport'а:
-Case #vStoreSize  : System\VPWidth = WindowWidth(System\ViewPort\WindowID)
-System\VPHeight   = WindowHeight(System\ViewPort\WindowID)
 Case #vCenterWin  : X = (GetSystemMetrics_(#SM_CXSCREEN)-WindowWidth(System\ViewPort\WindowID)) >> 1
 Y = (GetSystemMetrics_(#SM_CYSCREEN) - WindowHeight(System\ViewPort\WindowID)) >> 1
 ResizeWindow(System\ViewPort\WindowID, X, Y, #PB_Ignore, #PB_Ignore) ; Центрируем.
@@ -4328,22 +4427,25 @@ Case #vSaveAs     : SaveAs(Node2Index(System\ViewPort\DataNode))
 Case #vSaveSnap   : SaveScaled(System\ViewPort, Node2Index(System\ViewPort\DataNode))
 Case #vHighLight  : SetGadgetState(#ClipList,Node2Index(System\ViewPort\DataNode)):SetForegroundWindow_(System\MainWindow)
 System\CriticalStack() = #ClipList ; Выделяемся в списке.
-Case #vCopy       : If NotHTMLView() : SendMessage_(GadgetID(System\ViewPort\ViewArea), #WM_COPY, 0, 0) : Else 
-HTMLasHTML(System\ViewPort) : EndIf
+; Обработка контекстного меню для строки поиска:
 Case #cFindNext   : InitSearch()
 Case #cFindPrev   : InitSearch(#True)
 Case #cGoSearch   : System\CriticalStack() = #SearchBar
-Case #vCopyRaw    : If NotHTMLView() : RTFAsRaw(System\ViewPort) : Else : HTMLAsRaw(System\ViewPort) : EndIf ; Иначе - копируем так.
-Case #vSelectAll  : If NotHTMLView() : Sel\CpMax = -1                                                        ; Выделяем все.
-SetSel(System\ViewPort\ViewArea, sel) : Else : SelectAllHTML(System\ViewPort) : EndIf
-Case #vWordWrap   : SetWordWrap(System\ViewPort, System\ViewPort\WrapFlag ! 1)
-Case #cViewData, #cCtrlV : OpenViewPort(NodeIdx) 
-Case #cRemove, #cDelete  : ClearData(NodeIdx)
-Case #cCopy, #cReturn    : RestoreData(NodeIdx)
-EndSelect       ; Дабы не ставить метку.
+Case #cViewData, #cCtrlV  : OpenViewPort(NodeIdx) 
+Case #cRemove  , #cDelete : ClearData(NodeIdx)
+Case #cCopy    , #cReturn : RestoreData(NodeIdx)
+; Спец. обработка для нодов текстового содержания:
+Case #vCopy       : If NotHTMLView() : SendMessage_(GadgetID(System\ViewPort\ViewArea), #WM_COPY, 0, 0) : Else ; Прямое копирование.
+HTMLasHTML(System\ViewPort) : EndIf
+Case #vCopyRaw    : If NotHTMLView() : RTFAsRaw(System\ViewPort) : Else : HTMLAsRaw(System\ViewPort) : EndIf   ; Копирование текста.
+Case #vCopyMD     : HTMLAsHTML(System\ViewPort, #True)                                                         ; Копирование разметки.
+Case #vSelectAll  : If IsTextNode(System\ViewPort\DataNode, #True) : If NotHTMLView() : Sel\CpMax = -1         ; Выделение всей области.
+SetSel(System\ViewPort\ViewArea, sel) : Else : SelectAllHTML(System\ViewPort) : EndIf : EndIf
+Case #vWordWrap   : SetWordWrap(System\ViewPort, System\ViewPort\DataNode\WrapFlag ! 1)
+EndSelect  ; Дабы не ставить метку.
 LeaveCritical() ; Продолжаем блюсти.
 EndProcedure
-
+  
 Procedure SetAnalyzis()
 Define *HLNode = Index2Node(GetGadgetState(#ClipList))
 If *HLNode <> System\LastAnalyzed : ConnectInformer() : System\LastAnalyzed = *HLNode : LinkOptics(*HLNode) : EndIf
@@ -4388,9 +4490,9 @@ EndIf
 Next : HideWindow(#MainWindow, #True) : AddTray()
 EndProcedure
 ;}
-;} EndProcedures
+;} {End/Procedures}
 
-; ==Preparations==
+;{ ==Preparations==
 Repeat: System\DupMutex = CreateMutex_(0, 0, #SinglerMx) : If System\DupMutex : Break : Else : Delay(100) : EndIf : ForEver
 If GetLastError_() : ErrorBox("program is already running !" + #CR$ + "Press 'OK' to exit.") : End : EndIf
 CompilerIf Not #PB_Compiler_Debugger : OnErrorCall(@ErrorHandler()) ; Выставляем обработчик ошибок, коли нет своего.
@@ -4436,9 +4538,8 @@ System\SearchBar = GadgetID(#SearchBar) : SetSearcherDummy() : ChangeCB(System\S
 ; -Extra win preparations-
 SetupBuffers(System\FlickBuf)
 WindowBounds(#MainWindow, #MinWidth, #MinHeight, #PB_Ignore, #PB_Ignore) : SetWindowCallback(@WinCallback(), #MainWindow) 
-RestoreVolatile() : UpdateSwitch() : AddWindowTimer(#MainWindow, #tBackupTimer, 15 * #Minute) ; Таймер резервного копирования.
 SwitchStyle(System\MainWindow, #WS_EX_LAYERED|System\XPLegacy)                             ; Выставляем необходимы стили окна.
-OpenWindow_SettingsWindow() : LocateSettings() : StickyWindow(#SettingsWindow, #True) : SetOpacity() ; Opaque right now.
+OpenWindow_SettingsWindow()     : StickyWindow(#SettingsWindow, #True) : SetOpacity()      ; Opaque right now.
 ChangeCB(GadgetID(#Button_Front), ContainerCallback()) : ChangeCB(GadgetID(#Button_Back) , ContainerCallback())
 ChangeCB(System\ListID          , DataListCallback()) : ;SetWindowColor(#MainWindow, #WinShade) 
 ; -Panopticum-
@@ -4448,6 +4549,8 @@ Editorial(\PlainArea)   : MakeTextPlain(GadgetID(\PlainArea)) : Editorial(\RTFAr
 BMPort(\BitmapArea)     : WebPort(\HTMLArea) : \NoiseArea = ImageGadget(VASizings(), #Null, #PB_Image_Border)
 \ViewArea = \NoiseArea  : ConfigureVP(System\Panopticum) ; Последние приготовления, да-да.
 EndWith
+; -Additional stuff from preferences-
+RestoreVolatile() : UpdateSwitch() : AddWindowTimer(#MainWindow, #tBackupTimer, 15 * #Minute) ; Таймер резервного копирования.
 ; -Shortcuts-
 ShortControl(Return, #cReturn, 0) ; Восстановление элемента под курсором. Ну, одно из. Альтернативное.
 ShortControl(F3, #cFindNext, 0) : ShortControl(F3, #cFindPrev,  #PB_Shortcut_Shift)
@@ -4486,7 +4589,7 @@ RegBoolOption("FixTrayIcon"  , FixedTray , Fixed)
 ; -Prepare formats-
 System\ClipRTF  = RegisterClipboardFormat_(#CF_RTF)
 System\ClipHTML = RegisterClipboardFormat_("HTML Format")
-RegFormat(5, #CF_TEXT       , "STR", #PB_Drop_Text)     : RegFormat(4, #CF_HDROP     , "DIR", #PB_Drop_Files) 
+RegFormat(5, #CF_TEXT       , "STR" , #PB_Drop_Text)    : RegFormat(4, #CF_HDROP     , "DIR", #PB_Drop_Files) 
 RegFormat(3, System\ClipHTML, "HTML", System\ClipHTML)  : RegFormat(2, #CF_BITMAP    , "BMP", #PB_Drop_Image)
 RegFormat(1, #CF_ENHMETAFILE, "META", #CF_METAFILEPICT) : RegFormat(0, System\ClipRTF, "RTF", System\ClipRTF)
 Pref(#CF_HTML) = Pref(System\ClipHTML)                  : Pref(#CF_RichText) = Pref(System\ClipRTF)
@@ -4495,7 +4598,7 @@ SetDropCallback(@DropCB()) : EnableGadgetDrop(#ClipList, #PB_Drop_Private, #Drag
 System\SetupWindow = WindowID(#SettingsWindow) ; Получаем ID.
 InitTable()                          ; Подготавливаем таблицу.
 ClosePreferences() : WriteAllPrefs() ; Закрываем файл настроек.
-RestoreDump() : CheckMaximum() : UpdateTitle()   ; Восстанавливаем все.
+RestoreDump() : CheckMaximum() : UpdateTitle() ; Восстанавливаем все.
 System\CloseMsg   = RegisterWindowMessage_("Slippery_Close")   ; Регистрируем сообщение (close).
 System\UpdateMsg  = RegisterWindowMessage_("Slippery_Adapt")   ; Регистрируем сообщение (update).
 System\HideMsg    = RegisterWindowMessage_("Slippery_Hide")    ; Регистрируем сообщение (hide).
@@ -4546,8 +4649,8 @@ DefSearchFlag("sel"   , #sfSel    , HLFlag    , #True)
 DefSearchFlag("~sel"  , #sfNoSel  , HLFlag    , #False)
 DefSearchFlag("bound" , #sfHKBound  , BindingFlag, #HotBound)
 DefSearchFlag("~bound", #sfHKUnbound, BindingFlag, #HotUnBound)
-
-; ==Main loop==
+;} {End/Preparations}
+;{ ==Main loop==
 HideWindow(#MainWindow, #False)
 With System\GUIEvent
 Repeat : SetAnalyzis() : ReceiveEvent(System\GUIEvent)
@@ -4577,15 +4680,16 @@ ViewPortMenu(ExtractWP(\Window))
 EndIf
 ForEver
 EndWith
-
-; -AfterMath-
+;} {End/Loop}
+;{ ==AfterMath==
 ! AfterMath: ; Спасибо Фреду за наше счастливое детство !
 SetWindowCallback(0, #MainWindow) : HideWindow(#SettingsWindow, #True) : HideWindow(#MainWindow, #True)
 ChangeClipboardChain_(System\MainWindow, System\NextWindow)     ; Убираемся из цепи.
 DisableDebugger : RemoveSysTrayIcon(#TrayIcon) : EnableDebugger ; Иконка в трее.
 SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На прощание - сохраняем данные.
+;} {End/AfterMath}
 ; IDE Options = PureBasic 5.30 (Windows - x86)
-; Folding = Cx-48-ff--+----8-f--0v---8---8f---+84--
+; Folding = O6-48--00-8----f--8-v-0--f----0---f-08-P-
 ; EnableUnicode
 ; EnableUser
 ; UseIcon = ClipBoard.ico

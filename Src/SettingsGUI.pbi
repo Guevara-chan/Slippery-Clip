@@ -101,7 +101,7 @@ Procedure OpenWindow_SettingsWindow()
     CheckBoxGadget(#CheckAltPasting, 15, 400, 245, 25, "Bruteforce pasting emulation (Ctrl+C)")
     GadgetToolTip(#CheckAltPasting, "Use keyboard messages instead of WM_PASTE. More compatible.")
     CheckBoxGadget(#CheckMimic, 15, 421, 260, 25, "Use data list layout for plain text render")
-    CheckBoxGadget(#CheckSnap, 15, 442, 260, 25, "Try aligning windows to each other.")
+    CheckBoxGadget(#CheckSnap, 15, 442, 260, 25, "Try aligning windows to each other")
     GadgetToolTip(#CheckSnap, "Experimental. May complicate viewport management.")
     ButtonGadget(#Button_Cancel, 5, 480, 80, 25, "Cancel", #BS_FLAT)
     ButtonGadget(#Button_Reset, 105, 480, 80, 25, "Reset", #BS_FLAT)
@@ -150,8 +150,6 @@ Procedure OpenWindow_SettingsWindow()
   EndIf
 EndProcedure
 
-; IDE Options = PureBasic 5.21 LTS (Windows - x86)
-; CursorPosition = 72
-; FirstLine = 54
+; IDE Options = PureBasic 5.30 (Windows - x86)
 ; Folding = -
 ; EnableXP
