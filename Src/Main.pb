@@ -4689,7 +4689,7 @@ DisableDebugger : RemoveSysTrayIcon(#TrayIcon) : EnableDebugger ; Иконка �
 SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На прощание - сохраняем данные.
 ;} {End/AfterMath}
 ; IDE Options = PureBasic 5.30 (Windows - x86)
-; Folding = O6-48--00-8----f--8-v-0--f----0---f-08-P-
+; Folding = C6-48--00-8----f--8-v-0--f----0---f-08-P-
 ; EnableUnicode
 ; EnableUser
 ; UseIcon = ClipBoard.ico
