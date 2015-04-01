@@ -26,6 +26,6 @@ It relies on single dependency: COMate+ by nxSoftWare.
 To compile project use 'Main.pb' as root sourcefile.  
 
 ## /Brief samples of interfacing/:
-![](https://cloud.githubusercontent.com/assets/8768470/6955065/bfd08c9c-d8e1-11e4-8159-dbe2c5e01a7f.png)
+![SlipperyClip @ CP (white)](https://cloud.githubusercontent.com/assets/8768470/6955080/df32fea8-d8e1-11e4-8b34-c3c6448cf8be.png)
 
-![](http://download-codeplex.sec.s-msft.com/Download?ProjectName=slipperyclip&DownloadId=909008)
+![SlipperyClip @ IDE (black)](https://cloud.githubusercontent.com/assets/8768470/6955065/bfd08c9c-d8e1-11e4-8159-dbe2c5e01a7f.png)
