@@ -43,7 +43,7 @@ UsePNGImageEncoder()      ; For data saving.
 UseJPEGImageEncoder()     ; For data saving.
 UseJPEG2000ImageEncoder() ; For data saving.
 UseBriefLZPacker()        ; For data saving.
-CompilerElse : CompilerError "No. Just no. Try it Unicode next time"
+CompilerElse : CompilerError "No. Just no. Try it Unicode next time."
 CompilerEndIf ; ^To notify that you done things tremendously wrong^
 
 CompilerIf #PB_Compiler_Version => 540
