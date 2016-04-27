@@ -1,6 +1,6 @@
 ﻿*-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-*
 Title: Slippery Clip
-Version: v1.12 (Release)
+Version: v1.21 (Release)
 Distribution: FreeWare OpenSource
 Dev. environment: PureBASIC v5.30
 Dependencies: COMate+ (bundled)
