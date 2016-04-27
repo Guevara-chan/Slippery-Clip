@@ -1,9 +1,10 @@
 ﻿; *-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-*
-; Slippery Clip|board manager v1.2
+; Slippery Clip|board manager v1.21
 ; Developed in 2010 by Guevara-chan.
 ; *-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-*
 
 ;{ =[TO.DO]=
+; TO.DO Визуализировать блокировку входящих.
 ; TO.DO Добавить всплывающее меню для вставки.
 ; TO.DO Перенести больше функций на обработку с клавиатуры.
 ; -----------------------------------------------------------------------------
@@ -44,6 +45,11 @@ UseJPEG2000ImageEncoder() ; For data saving.
 UseBriefLZPacker()        ; For data saving.
 CompilerElse : CompilerError "No. Just no. Try it Unicode next time"
 CompilerEndIf ; ^To notify that you done things tremendously wrong^
+
+CompilerIf #PB_Compiler_Version => 540
+UseCRC32Fingerprint() ; Legacy codec.
+UseMD5Fingerprint()   ; Legacy codec.
+CompilerEndIf
 
 ;{ [Definitions]
 ;{ --Constants--
@@ -510,6 +516,8 @@ HoldField.i   ; Index of field to hold selection on.
 XPLegacy.i    ; GUI flag for my beloved OS.
 SizeMsg.i     ; Resizer's message.
 *ListFont     ; All data for list' font.
+Bullet.s{1}   ; OS-dependant character.
+SnapShift.i   ; OS-dependant corrector for snapping procedure.
 ; Former indexators:
 *LockedNode.ClipData ; Pointer to data node, locked for dialog.
 *UsedNode.ClipDat    ; Pointer to currently selected node.
@@ -675,6 +683,16 @@ Define *Start = *Ptr
 While *Ptr\U : *Ptr + SizeOf(Unicode) : Wend
 ProcedureReturn (*Ptr - *Start) >> 1 ; Посчитали ? Возвращаем.
 EndProcedure
+
+CompilerIf #PB_Compiler_Version => 540 ; Не было печали - апдейтов накачали !
+Procedure.l CRC32Fingerprint(*DataPtr, DataSize.i) ; Legacy fingerprint.
+ProcedureReturn Val("$" + Fingerprint(*DataPtr, DataSize, #PB_Cipher_CRC32))
+EndProcedure
+
+Macro MD5Fingerprint(DataPtr, DataSize) ; Pseudo-procedure.
+Fingerprint(DataPtr, DataSize, #PB_Cipher_MD5)
+EndMacro
+CompilerEndIf
 ;}
 ;{ --GUI management--
 Procedure Node2Index(*DataNode.ClipData)
@@ -2342,7 +2360,7 @@ EndProcedure
 
 Procedure Changer()
 Define *Informer = EventGadget(), Idx = GetGadgetState(*Informer) 
-If Idx <> -1 : SetClipboardText(Mid(GetGadgetItemText(*Informer, Idx), 2))
+If Idx <> -1 : SetClipboardText(Mid(GetGadgetItemText(*Informer, Idx), 3))
 SetGadgetState(*Informer, -1) : EndIf ; Убиваем.
 EndProcedure
 
@@ -2400,7 +2418,7 @@ Define TText.s = FlattenText(Text), Shifter = -ShiftFactor(TText) / #ShiftStep
 EndProcedure
 
 Macro AddField(fData, Field = -1) ; Partializer.
-AddGadgetItem(*IBlock\InBox, -1, " " + fData) : Define LastIdx = CountGadgetItems(*IBlock\InBox)
+AddGadgetItem(*IBlock\InBox, -1, System\Bullet + " " + fData) : Define LastIdx = CountGadgetItems(*IBlock\InBox)
 If *IBlock\InBox = System\Informator\InBox : SetGadgetItemData(*IBlock\InBox, LastIdx - 1, Field) ; Ставим флаг для поиска.
 If System\HoldField = Field : Hfld = LastIdx : EndIf : EndIf               ; Проверка удержания.
 EndMacro
@@ -4230,14 +4248,14 @@ EndProcedure
 
 Procedure FillWinRect(*Window, *Bounds.Rect)
 With *Bounds
-\Top = WindowY(*Window) : \Left = WindowX(*Window)
+\Top = WindowY(*Window) : \Left = WindowX(*Window) - System\SnapShift
 \Bottom = \Top  + WindowHeight(*Window, #PB_Window_FrameCoordinate)
 \Right  = \Left + WindowWidth(*Window, #PB_Window_FrameCoordinate)
 EndWith
 EndProcedure
 
-Macro InBound(Val, Min, MAx) ; Pseudo-procedure.
-(Val => Min And Val <= MAx)
+Macro InBound(Val, Min, Max) ; Pseudo-procedure.
+(Val => Min And Val <= Max)
 EndMacro
 
 Macro CheckSpacing(Coord, CoordAlt, LBound, UBound) ; Partializer.
@@ -4252,16 +4270,15 @@ Action : SetSnapped(*SrcWin, Dir) : Break : EndIf ; ...Сдвигаем окно
 EndIf
 EndMacro
 
-
 Procedure CheckSnapDelay(*Win) ; Partializer
 Define MS = CheckSnapped(*Win, #NoSnap)
-If MS = 0 Or ElapsedMilliseconds() - MS > 200 : : ProcedureReturn #True : EndIf
+If MS = 0 Or ElapsedMilliseconds() - MS > 200 : ProcedureReturn #True : EndIf
 EndProcedure
 
 Procedure TrySnappingTo(*SrcWin, *TargetWin)
 If *SrcWin <> *TargetWin And ChecksnapDelay(*SrcWin) And IsWindowVisible_(WindowID(*TargetWin)) ; Если имеет смысл этим заниматься...
 Define Src.Rect, Target.Rect : FillWinRect(*SrcWin, @Src)       ; Прямоугольник-источник.
-Define After.Rect = Src      : FillWinRect(*TargetWin, @Target) ; Прямоугольник окна, которому прятягиваемся.
+Define After.Rect = Src      : FillWinRect(*TargetWin, @Target) ; Прямоугольник окна, к которому прятягиваемся.
 With After ; -Проверяем, есть ли точки соприкосновения...-
 Repeat ; Пытаемся притянуться к целевому окну...
 CheckSpacing(\Top , \Bottom, Target\Top , Target\Bottom)         ; ---Горизонталь.
@@ -4500,6 +4517,8 @@ CompilerEndIf : OpenIniFile() ; Открываем файл настроек...
 ; -Win preparations-
 System\XPLegacy = Bool(OSVersion() = #PB_OS_Windows_XP Or OSVersion() = #PB_OS_Windows_8) * #WS_EX_COMPOSITED ; Ддя порядка.
 If System\XPLegacy : System\SizeMsg = #WM_SIZE : Else : System\SizeMsg = #WM_WINDOWPOSCHANGED : EndIf 
+If OSVersion() > #PB_OS_Windows_XP : System\Bullet = "•" : Else : System\Bullet = "" : EndIf ; Контекстно-зависимый круг.
+If OSVersion() => #PB_OS_Windows_10 : System\SnapShift = 5 : EndIf     ; Корректор для стыкующихся окон.
 System\LastSrc    = GetForegroundWindow_()                             ; Сохраняем окно, которое могло бы быть источником.
 System\MainWindow = OpenWindow(#MainWindow, 0, 0, #MinWidth, #MinHeight, #Title, #WinFlags|#PB_Window_ScreenCentered)
 System\OwnHandle  = GetWindowThreadProcessId_(System\MainWindow, 0)    ; Сохраняем указатель.
@@ -4688,23 +4707,23 @@ ChangeClipboardChain_(System\MainWindow, System\NextWindow)     ; Убираем
 DisableDebugger : RemoveSysTrayIcon(#TrayIcon) : EnableDebugger ; Иконка в трее.
 SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На прощание - сохраняем данные.
 ;} {End/AfterMath}
-; IDE Options = PureBasic 5.30 (Windows - x86)
-; Folding = C6-48--00-8----f--8-v-0--f----0---f-08-P-
+; IDE Options = PureBasic 5.40 LTS (Windows - x86)
+; Folding = C6-v4--88-4-----+-4-f-8---+---8----+84-P+
 ; EnableUnicode
 ; EnableUser
 ; UseIcon = ClipBoard.ico
 ; Executable = ..\SlipperyClip.exe
 ; CurrentDirectory = ..\
 ; IncludeVersionInfo
-; VersionField0 = 1,2,0,0
-; VersionField1 = 1,2,0,0
+; VersionField0 = 1,21,0,0
+; VersionField1 = 1,21,0,0
 ; VersionField2 = Guevara-chan [~R.i.P]
 ; VersionField3 = Slippery Clip
-; VersionField4 = 1.2
-; VersionField5 = 1.2
+; VersionField4 = 1.21
+; VersionField5 = 1.21
 ; VersionField6 = Slippery Clip|board manager
 ; VersionField7 = Slippery Clip
 ; VersionField8 = SlipperyClip.exe
-; VersionField9 = Copyleft В© 2010, Guevara-chan
+; VersionField9 = Copyleft (ɔ) 2010, Guevara-chan
 ; VersionField13 = Guevara-chan@Mail.ru
 ; VersionField14 = http://vk.com/guevara_chan
