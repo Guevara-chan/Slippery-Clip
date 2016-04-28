@@ -21,7 +21,7 @@
 - Complete Unicode-compilancy.
 
 ## /Reassembling/:
-**SlipperyClip** is written completely in PureBasic v5.30 with few fixes for v5.24 compatibility.  
+**SlipperyClip** is written completely in PureBasic v5.30 with few fixes for v5.24 and v5.40 compatibility.  
 It relies on single dependency: COMate+ by nxSoftWare.  
 To compile project use 'Main.pb' as root sourcefile.  
 
