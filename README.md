@@ -20,9 +20,9 @@
 - Complete Unicode-compilancy.
 
 ## /Reassembling/:
-**SlipperyClip** is written completely in PureBasic v5.30 with few fixes for v5.24 and v5.40 compatibility.  
-It relies on single dependency: COMate+ by nxSoftWare.  
-To compile project use 'Main.pb' as root sourcefile.  
+**SlipperyClip** is written completely in [PureBasic v5.30](http://www.purebasic.com) with few fixes for v5.24 and v5.40 compatibility.  
+It relies on single external dependency: COMate+ by nxSoftWare.  
+To rubild - compile `Main.pb` as root sourcefile.  
 
 ## /Brief samples of interfacing/:
 ![SlipperyClip @ CP (white)](https://cloud.githubusercontent.com/assets/8768470/6955080/df32fea8-d8e1-11e4-8b34-c3c6448cf8be.png)
