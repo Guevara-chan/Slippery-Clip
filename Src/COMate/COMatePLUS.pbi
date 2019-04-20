@@ -48,9 +48,9 @@ CompilerEndIf
 ;-PROTOTYPES.
   ;The following prototype caters for Ansi / Unicode when creating BSTR's.
     Prototype.i COMate_ProtoMakeBSTR(value.p-unicode)
-  ;The following is for any automation servers opting to defer filling in EXCEPINFO structures in the case of a dispinterface
+  ;The following is for any automation servers opting to defer filling in EXCEPINFO2 structures in the case of a dispinterface
   ;function yielding an error etc. In these cases a callback is provided by the server which we call manually.
-    Prototype.i COMate_ProtoDeferredFillIn(*excepinfo)
+    Prototype.i COMate_ProtoDeferredFillIn(*EXCEPINFO2)
   ;The following prototypes allow for various return types from event handlers.
     Prototype COMate_EventCallback_NORETURN(COMateObject.COMateObject, EventName$, ParameterCount)
     Prototype.q COMate_EventCallback_INTEGERRETURN(COMateObject.COMateObject, EventName$, ParameterCount)
@@ -126,9 +126,9 @@ CompilerEndIf
     EndStructure
 
   ;The following structure is used in the iDispatch\Invoke() method call to receive detailed errors.
-  CompilerIf Defined(EXCEPINFO, #PB_Structure) = 0
+  CompilerIf Defined(EXCEPINFO2, #PB_Structure) = 0
      CompilerIf #PB_Compiler_Processor = #PB_Processor_x64
-        Structure EXCEPINFO
+        Structure EXCEPINFO2
          wCode.w
          wReserved.w
          pad.b[4] ; Only on x64
@@ -142,7 +142,7 @@ CompilerEndIf
          pad2.b[4] ; Only on x64
       EndStructure
     CompilerElse
-      Structure EXCEPINFO
+      Structure EXCEPINFO2
          wCode.w
          wReserved.w
          bstrSource.i                ;BSTR
@@ -582,7 +582,7 @@ EndProcedure
 ;Returns the new COMateEnum object or zero if an error.
 Procedure.i COMateClass_CreateEnumeration(*this._membersCOMateClass, command$, *hStatement=0)
   Protected result.i = #S_OK, *object._membersCOMateEnumClass, *tempCOMateObject._membersCOMateClass, iDisp.IDISPATCH
-  Protected dp.DISPPARAMS, excep.EXCEPINFO, var.VARIANT
+  Protected dp.DISPPARAMS, excep.EXCEPINFO2, var.VARIANT
   *object = AllocateMemory(SizeOf(_membersCOMateEnumClass))
   If *object
     *object\vTable = ?VTable_COMateEnumClass
@@ -617,7 +617,7 @@ Procedure.i COMateClass_CreateEnumeration(*this._membersCOMateClass, command$, *
       EndIf
     Else
       If result = #DISP_E_EXCEPTION
-      ;Has the automation server deferred from filling in the EXCEPINFO structure?
+      ;Has the automation server deferred from filling in the EXCEPINFO2 structure?
         If excep\pfnDeferredFillIn
           excep\pfnDeferredFillIn(excep)
         EndIf
@@ -1367,7 +1367,7 @@ EndProcedure
 ;Returns a HRESULT value; #S_OK for no errors.
 Procedure.i COMateClass_INTERNAL_InvokeiDispatch(*this._membersCOMateClass, invokeType, returnType, *ret.VARIANT, iDisp.iDispatch, subObjectIndex, *statement._COMatePLUSStatement)
   Protected result.i = #S_OK
-  Protected dispID, dp.DISPPARAMS, dispIDNamed, excep.EXCEPINFO, uiArgErr
+  Protected dispID, dp.DISPPARAMS, dispIDNamed, excep.EXCEPINFO2, uiArgErr
   ;First task is to retrieve the dispID corresponding to the method/property.
     result = iDisp\GetIDsOfNames(?IID_NULL, @*statement\methodName[subObjectIndex], 1, #LOCALE_USER_DEFAULT, @dispID)
   If SUCCEEDED(result)
@@ -1384,7 +1384,7 @@ Procedure.i COMateClass_INTERNAL_InvokeiDispatch(*this._membersCOMateClass, invo
     ;Call the method/property.
       result = iDisp\Invoke(dispID, ?IID_NULL, #LOCALE_USER_DEFAULT, invokeType, dp, *ret, excep, @uiArgErr)
     If result = #DISP_E_EXCEPTION
-      ;Has the automation server deferred from filling in the EXCEPINFO structure?
+      ;Has the automation server deferred from filling in the EXCEPINFO2 structure?
         If excep\pfnDeferredFillIn
           excep\pfnDeferredFillIn(excep)
         EndIf
@@ -2560,9 +2560,10 @@ EndDataSection
 
 CompilerEndIf
 
-; IDE Options = PureBasic 5.30 (Windows - x86)
-; ExecutableFormat = Shared Dll
+; IDE Options = PureBasic 5.70 LTS (Windows - x86)
+; ExecutableFormat = Shared dll
+; CursorPosition = 36
 ; Folding = ----------
-; EnableUnicode
 ; EnableThread
 ; Executable = nxReportU.dll
+; EnableUnicode
