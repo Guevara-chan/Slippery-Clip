@@ -4249,8 +4249,11 @@ EndProcedure
 Procedure FillWinRect(*Window, *Bounds.Rect)
 With *Bounds
 \Top = WindowY(*Window) : \Left = WindowX(*Window) - System\SnapShift
-\Bottom = \Top  + WindowHeight(*Window, #PB_Window_FrameCoordinate)
-\Right  = \Left + WindowWidth(*Window, #PB_Window_FrameCoordinate)
+CompilerIf #PB_Compiler_Version => 550 : #SizeFlag = #PB_Window_InnerCoordinate ; Не было печали...
+CompilerElse : #SizeFlag = #PB_Window_FrameCoordinate
+CompilerEndIf
+\Bottom = \Top  + WindowHeight(*Window, #SizeFlag)
+\Right  = \Left + WindowWidth(*Window, #SizeFlag)
 EndWith
 EndProcedure
 
@@ -4707,9 +4710,8 @@ ChangeClipboardChain_(System\MainWindow, System\NextWindow)     ; Убираем
 DisableDebugger : RemoveSysTrayIcon(#TrayIcon) : EnableDebugger ; Иконка в трее.
 SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На прощание - сохраняем данные.
 ;} {End/AfterMath}
-; IDE Options = PureBasic 5.40 LTS (Windows - x86)
+; IDE Options = PureBasic 5.70 LTS (Windows - x86)
 ; Folding = C6-v4--88-4-----+-4-f-8---+---8----+84-P+
-; EnableUnicode
 ; EnableUser
 ; UseIcon = ClipBoard.ico
 ; Executable = ..\SlipperyClip.exe
@@ -4727,3 +4729,4 @@ SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На �
 ; VersionField9 = Copyleft (ɔ) 2010, Guevara-chan
 ; VersionField13 = Guevara-chan@Mail.ru
 ; VersionField14 = http://vk.com/guevara_chan
+; EnableUnicode
