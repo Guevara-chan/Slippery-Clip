@@ -4249,7 +4249,7 @@ EndProcedure
 Procedure FillWinRect(*Window, *Bounds.Rect)
 With *Bounds
 \Top = WindowY(*Window) : \Left = WindowX(*Window) - System\SnapShift
-CompilerIf #PB_Compiler_Version => 550 : #SizeFlag = #PB_Window_InnerCoordinate ; Не было печали...
+CompilerIf #PB_Compiler_Version <> 540 : #SizeFlag = #PB_Window_InnerCoordinate ; Не было печали...
 CompilerElse : #SizeFlag = #PB_Window_FrameCoordinate
 CompilerEndIf
 \Bottom = \Top  + WindowHeight(*Window, #SizeFlag)
@@ -4521,7 +4521,7 @@ CompilerEndIf : OpenIniFile() ; Открываем файл настроек...
 System\XPLegacy = Bool(OSVersion() = #PB_OS_Windows_XP Or OSVersion() = #PB_OS_Windows_8) * #WS_EX_COMPOSITED ; Ддя порядка.
 If System\XPLegacy : System\SizeMsg = #WM_SIZE : Else : System\SizeMsg = #WM_WINDOWPOSCHANGED : EndIf 
 If OSVersion() > #PB_OS_Windows_XP : System\Bullet = "•" : Else : System\Bullet = "" : EndIf ; Контекстно-зависимый круг.
-If OSVersion() => #PB_OS_Windows_10 : System\SnapShift = 5 : EndIf     ; Корректор для стыкующихся окон.
+If OSVersion() => #PB_OS_Windows_Future : System\SnapShift = 5 : EndIf     ; Корректор для стыкующихся окон.
 System\LastSrc    = GetForegroundWindow_()                             ; Сохраняем окно, которое могло бы быть источником.
 System\MainWindow = OpenWindow(#MainWindow, 0, 0, #MinWidth, #MinHeight, #Title, #WinFlags|#PB_Window_ScreenCentered)
 System\OwnHandle  = GetWindowThreadProcessId_(System\MainWindow, 0)    ; Сохраняем указатель.
@@ -4710,8 +4710,9 @@ ChangeClipboardChain_(System\MainWindow, System\NextWindow)     ; Убираем
 DisableDebugger : RemoveSysTrayIcon(#TrayIcon) : EnableDebugger ; Иконка в трее.
 SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На прощание - сохраняем данные.
 ;} {End/AfterMath}
-; IDE Options = PureBasic 5.70 LTS (Windows - x86)
-; Folding = C6-v4--88-4-----+-4-f-8---+---8----+84-P+
+; IDE Options = PureBasic 5.31 (Windows - x86)
+; Folding = C6-v4--88-4-----+-4-f-8---+---8----+84-f+
+; EnableUnicode
 ; EnableUser
 ; UseIcon = ClipBoard.ico
 ; Executable = ..\SlipperyClip.exe
@@ -4729,4 +4730,3 @@ SendNotifyMessage_(#HWND_BROADCAST, System\CloseMsg, 0, 0) : DoBackUp() ; На �
 ; VersionField9 = Copyleft (ɔ) 2010, Guevara-chan
 ; VersionField13 = Guevara-chan@Mail.ru
 ; VersionField14 = http://vk.com/guevara_chan
-; EnableUnicode
