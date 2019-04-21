@@ -20,7 +20,7 @@
 - Complete Unicode-compilancy.
 
 ## /Reassembling/:
-**SlipperyClip** was written for [PureBasic v5.20](http://purebasic.com), though compatible with *5.7x (LTS)*. 
+**SlipperyClip** was written for [PureBasic v5.20](http://purebasic.com), though compatible with *5.7x (LTS)*.  
 It relies on single external dependency: _COMate+_ by nxSoftWare (bundled in repository).  
 To rubild - compile `Main.pb` as root sourcefile.  
 
