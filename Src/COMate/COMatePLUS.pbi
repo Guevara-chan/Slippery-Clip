@@ -1892,7 +1892,11 @@ Procedure.i COMatePLUS_TokeniseCommand(command$, separator$, Array parse._COMate
           Next
         If t1
           If *buffer <> buffer
-            parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+        		CompilerIf #PB_Compiler_Version >= 641
+        			parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=PeekS(buffer, charPos);*ptrString\s
+        		CompilerElse
+        			parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+        		CompilerEndIf
             parse(methodCount)\numberoftokens+1
             *buffer = buffer : *buffer\c = 0
           ElseIf *command\c = 39 ;Open quote, buffer empty.
@@ -1913,7 +1917,11 @@ Procedure.i COMatePLUS_TokeniseCommand(command$, separator$, Array parse._COMate
               methodCount = 0
               Break
             EndIf
-            parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+          	CompilerIf #PB_Compiler_Version >= 641
+            	parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=PeekS(buffer, charPos)
+          	CompilerElse
+        		parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+        	CompilerEndIf  
             parse(methodCount)\numberoftokens+1
             charPos+1 : *command + SizeOf(CHARACTER)
             *buffer = buffer : *buffer\c = 0
@@ -1949,7 +1957,11 @@ Procedure.i COMatePLUS_TokeniseCommand(command$, separator$, Array parse._COMate
               EndIf
             Else
               *buffer\c = *command\c : *buffer + SizeOf(CHARACTER) : *buffer\c = 0
-              parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+              CompilerIf #PB_Compiler_Version >= 641 
+                parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=PeekS(buffer, charPos)
+              CompilerElse
+        		parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+	          CompilerEndIf 
               parse(methodCount)\numberoftokens+1
               charPos+1
               *command + SizeOf(CHARACTER)
@@ -1963,7 +1975,11 @@ Procedure.i COMatePLUS_TokeniseCommand(command$, separator$, Array parse._COMate
         ElseIf charPos = length
           *buffer\c = *command\c : *buffer + SizeOf(CHARACTER)
           *buffer\c = 0 ;Null.
-          parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+          CompilerIf #PB_Compiler_Version >= 641 
+            parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=PeekS(buffer, charPos)
+          CompilerElse
+        	parse(methodCount)\tokens$[parse(methodCount)\numberoftokens]=*ptrString\s
+          CompilerEndIf
           parse(methodCount)\numberoftokens+1
           charPos + 1
         Else          
